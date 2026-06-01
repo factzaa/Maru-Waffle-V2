@@ -169,6 +169,34 @@
     font-family:'Kanit';font-weight:700;font-size:15px;padding:13px;border-radius:12px;cursor:pointer;}
   @keyframes slideUp{from{transform:translateY(40px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 
+  /* Confirm/Warning modal */
+  .confirm-modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:70;padding:18px;}
+  .confirm-modal.show{display:flex;}
+  .confirm-modal .panel{background:#fff;border-radius:20px;max-width:440px;width:100%;overflow:hidden;animation:slideUp .25s;}
+  .confirm-modal .top{padding:22px 22px 6px;text-align:center;}
+  .confirm-modal .ic-circle{width:62px;height:62px;border-radius:50%;display:grid;place-items:center;margin:0 auto 12px;}
+  .confirm-modal .ic-circle svg{width:30px;height:30px;color:#fff;}
+  .confirm-modal.err .ic-circle{background:linear-gradient(135deg,#FF6B6B,#D02C2C);}
+  .confirm-modal.warn .ic-circle{background:linear-gradient(135deg,#FFB04A,#F37316);}
+  .confirm-modal h3{font-family:'Kanit';font-weight:700;font-size:18px;color:var(--ink);margin-bottom:5px;}
+  .confirm-modal p{font-size:14px;color:var(--ink-2);line-height:1.55;}
+  .confirm-modal .issues{margin:14px 22px;background:#FFF7E0;border-radius:12px;padding:13px 15px;}
+  .confirm-modal.err .issues{background:#FEF2F2;}
+  .confirm-modal .issues ul{list-style:none;padding:0;margin:0;}
+  .confirm-modal .issues li{font-size:13.5px;color:var(--ink);padding:5px 0;display:flex;gap:8px;align-items:flex-start;line-height:1.4;}
+  .confirm-modal .issues li::before{content:'•';color:var(--red);font-weight:700;flex:none;}
+  .confirm-modal.warn .issues li::before{color:#F37316;}
+  .confirm-modal .actions{display:flex;gap:8px;padding:14px 22px 22px;}
+  .confirm-modal .actions button{flex:1;border:0;font-family:'Kanit';font-weight:700;font-size:14.5px;padding:13px;border-radius:12px;cursor:pointer;}
+  .confirm-modal .btn-cancel{background:#F2EEDD;color:var(--ink);}
+  .confirm-modal .btn-confirm{background:var(--yellow);color:var(--ink);box-shadow:0 3px 10px rgba(242,177,0,.35);}
+  .confirm-modal.err .btn-confirm{background:var(--ink);color:var(--yellow);box-shadow:0 3px 10px rgba(26,26,26,.3);}
+
+  /* highlight error fields */
+  .field-error input,.field-error textarea{border-color:var(--red) !important;background:#FEF2F2 !important;animation:shake .35s;}
+  .chan-item.field-error{border-color:var(--red) !important;background:#FEF2F2;animation:shake .35s;}
+  @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}75%{transform:translateX(4px);}}
+
   /* SVG icon sizing per context */
   .card .h .ic svg{width:22px;height:22px;color:#fff;display:block;}
   .tab{display:inline-flex;align-items:center;justify-content:center;gap:7px;}
@@ -321,6 +349,22 @@
     <div class="step"><span class="n">2</span><div>เลื่อนหา <b>"เพิ่มไปยังหน้าจอโฮม"</b> (Add to Home Screen)</div></div>
     <div class="step"><span class="n">3</span><div>กด <b>"เพิ่ม"</b> มุมขวาบน — เสร็จเรียบร้อย!</div></div>
     <button class="close-btn" id="iosClose">รับทราบ</button>
+  </div>
+</div>
+
+<!-- Confirm/Warning modal -->
+<div class="confirm-modal" id="confirmModal">
+  <div class="panel">
+    <div class="top">
+      <div class="ic-circle" id="cmIcon"></div>
+      <h3 id="cmTitle"></h3>
+      <p id="cmText"></p>
+    </div>
+    <div class="issues" id="cmIssues"><ul></ul></div>
+    <div class="actions">
+      <button class="btn-cancel" id="cmCancel">กลับไปแก้ไข</button>
+      <button class="btn-confirm" id="cmConfirm">ยืนยันบันทึก</button>
+    </div>
   </div>
 </div>
 
@@ -587,7 +631,13 @@ const BRAND_LOGOS = {
     else { dd.textContent=diff===0?'฿0 (พอดี)':(diff>0?('+'+baht(diff)+' (เกิน)'):(baht(diff)+' (ขาด)')); dd.className='cv '+(diff<0?'warn':'ok'); }
   }
   ['rOpenCash','rCashIn','rRefund','rActual'].forEach(function(id){
-    document.getElementById(id).addEventListener('input',recalc);
+    document.getElementById(id).addEventListener('input',function(){
+      recalc();
+      const wrap = this.closest('.staff-f, .money-row'); if(wrap) wrap.classList.remove('field-error');
+    });
+  });
+  document.getElementById('rCloseStaff').addEventListener('input',function(){
+    const wrap = this.closest('.staff-f'); if(wrap) wrap.classList.remove('field-error');
   });
 
   // date change -> load existing report
@@ -615,28 +665,140 @@ const BRAND_LOGOS = {
   }
 
   // save
+  /* ---------- Validation + Confirm modal ---------- */
+  function clearFieldErrors(){
+    document.querySelectorAll('.field-error').forEach(function(el){el.classList.remove('field-error');});
+  }
+  function markError(elId){
+    const el = document.getElementById(elId); if(!el) return;
+    // หา wrapper ที่เหมาะสม
+    const wrap = el.closest('.staff-f, .money-row, .chan-item') || el.parentElement;
+    if (wrap) wrap.classList.add('field-error');
+  }
+
+  function showConfirm(kind, title, text, issues, onConfirm){
+    const m = document.getElementById('confirmModal');
+    m.className = 'confirm-modal show ' + kind;
+    document.getElementById('cmIcon').innerHTML = kind==='err' ? ICONS.alert : ICONS.alert;
+    document.getElementById('cmTitle').textContent = title;
+    document.getElementById('cmText').textContent = text;
+    const ul = document.getElementById('cmIssues').querySelector('ul');
+    ul.innerHTML = issues.map(function(i){return '<li>'+i+'</li>';}).join('');
+    document.getElementById('cmIssues').style.display = issues.length ? 'block' : 'none';
+
+    const confirmBtn = document.getElementById('cmConfirm');
+    const cancelBtn  = document.getElementById('cmCancel');
+    if (kind === 'err') {
+      confirmBtn.style.display = 'none';
+      cancelBtn.textContent = 'รับทราบ · กลับไปกรอก';
+    } else {
+      confirmBtn.style.display = '';
+      confirmBtn.textContent = 'ยืนยัน · บันทึกต่อ';
+      cancelBtn.textContent = 'กลับไปแก้ไข';
+    }
+    confirmBtn.onclick = function(){ m.classList.remove('show'); if(onConfirm) onConfirm(); };
+    cancelBtn.onclick  = function(){ m.classList.remove('show'); };
+  }
+
+  function validateReport(sales, expClean, recon, any, expSum){
+    clearFieldErrors();
+    const errors = [];   // บล็อก (กดบันทึกไม่ได้)
+    const warnings = []; // เตือน (ยืนยันก่อนบันทึก)
+
+    const hasReconActivity = recon.openingCash || recon.cashIn || recon.refund || recon.actualCash;
+    const hasAnyData = any || expClean.length || hasReconActivity || recon.closeStaff;
+
+    // -- บล็อก (errors) --
+    if (!hasAnyData) {
+      errors.push('ยังไม่ได้กรอกข้อมูลใดๆ');
+      return { errors: errors, warnings: warnings };
+    }
+
+    // ถ้ามีรายการ expense ที่มีจำนวนเงิน แต่ไม่ใส่ชื่อรายการ
+    expClean.forEach(function(e,i){
+      if (!e.item || !e.item.trim()) {
+        errors.push('ค่าใช้จ่ายรายการที่ ' + (i+1) + ' ไม่ได้ใส่ชื่อรายการ');
+      }
+    });
+
+    // ต้องลงชื่อพนักงานปิดรอบ ถ้ามียอดขายหรือกระทบยอด
+    if ((any || hasReconActivity) && !recon.closeStaff.trim()) {
+      errors.push('ยังไม่ได้ลงชื่อพนักงานปิดรอบ');
+      markError('rCloseStaff');
+    }
+
+    // ถ้ามียอดขายเงินสด/กระทบยอด → ต้องกรอกเงินจริงในลิ้นชัก
+    const cashSales = sales.cash || 0;
+    if ((cashSales > 0 || recon.openingCash > 0) && !document.getElementById('rActual').value) {
+      errors.push('ยังไม่ได้นับ "เงินจริงในลิ้นชัก" — กรุณานับเงินก่อนปิดรอบ');
+      markError('rActual');
+    }
+
+    // -- เตือน (warnings, ยืนยันได้) --
+    if (any) {
+      // ส่วนต่างเกิน 100 บาท ขาดเกิน
+      if (document.getElementById('rActual').value) {
+        const open = recon.openingCash;
+        const cashIn = recon.cashIn;
+        const refund = recon.refund;
+        const expected = open + cashSales + cashIn - refund - expSum;
+        const actual = recon.actualCash;
+        const diff = actual - expected;
+        if (Math.abs(diff) >= 100) {
+          warnings.push('ส่วนต่างเงินสด ' + (diff<0?'ขาด':'เกิน') + ' ฿' + Math.abs(diff).toLocaleString() + ' (เกิน 100 บาท) ตรวจสอบความถูกต้องอีกครั้ง');
+        }
+      }
+      // ใส่ actual แต่ไม่ใส่ opening cash
+      if (recon.actualCash > 0 && !recon.openingCash) {
+        warnings.push('ใส่ "เงินจริงในลิ้นชัก" แต่ไม่ได้ใส่ "เงินสดเริ่มต้น" — ส่วนต่างอาจคลาดเคลื่อน');
+      }
+    }
+
+    return { errors: errors, warnings: warnings };
+  }
+
+  function doSave(date, sales, expClean, recon){
+    const btn = document.getElementById('saveReport');
+    const origText = 'ส่งรายงานสิ้นวัน · เข้าไลน์กลุ่ม';
+    btn.disabled=true; btn.textContent='กำลังบันทึก...';
+    api('saveDailyReport',{data:{date:date,sales:sales,note:document.getElementById('rNote').value,expenses:expClean,recon:recon}})
+      .then(function(res){
+        toast(res.msg||'บันทึกแล้ว ✓'); btn.disabled=false; btn.textContent=origText;
+        loadReportForDate(date);
+      })
+      .catch(function(err){ toast('ผิดพลาด: '+err.message); btn.disabled=false; btn.textContent=origText; });
+  }
+
   document.getElementById('saveReport').addEventListener('click',function(){
     const date=document.getElementById('rDate').value;
     const sales={}; let any=false;
     CONFIG.channels.forEach(function(c){const v=parseFloat(document.getElementById('inp_'+c.key).value)||0; sales[c.key]=v; if(v>0) any=true;});
     const expClean=expenses.filter(function(e){return (parseFloat(e.amount)||0)>0 || (e.item||'').trim();})
       .map(function(e){return {item:e.item,amount:parseFloat(e.amount)||0,receipt:e.receipt,existingUrl:e.existingUrl};});
+    let expSum=0; expClean.forEach(function(e){expSum+=parseFloat(e.amount)||0;});
     const recon={
       openingCash:parseFloat(document.getElementById('rOpenCash').value)||0,
       cashIn:parseFloat(document.getElementById('rCashIn').value)||0,
       refund:parseFloat(document.getElementById('rRefund').value)||0,
       actualCash:parseFloat(document.getElementById('rActual').value)||0,
-      closeStaff:document.getElementById('rCloseStaff').value
+      closeStaff:document.getElementById('rCloseStaff').value||''
     };
-    const reconFilled = recon.openingCash||recon.actualCash||recon.closeStaff;
-    if(!any && !expClean.length && !reconFilled){ toast('ยังไม่มีข้อมูลให้บันทึก'); return; }
-    const btn=this; btn.disabled=true; btn.textContent='กำลังบันทึก...';
-    api('saveDailyReport',{data:{date:date,sales:sales,note:document.getElementById('rNote').value,expenses:expClean,recon:recon}})
-      .then(function(res){
-        toast(res.msg||'บันทึกแล้ว ✓'); btn.disabled=false; btn.textContent='ส่งรายงานสิ้นวัน · เข้าไลน์กลุ่ม';
-        loadReportForDate(date);
-      })
-      .catch(function(err){ toast('ผิดพลาด: '+err.message); btn.disabled=false; btn.textContent='ส่งรายงานสิ้นวัน · เข้าไลน์กลุ่ม'; });
+
+    const v = validateReport(sales, expClean, recon, any, expSum);
+
+    if (v.errors.length) {
+      showConfirm('err', 'กรอกข้อมูลไม่ครบ',
+        'กรุณากรอกข้อมูลต่อไปนี้ให้ครบก่อนส่งรายงาน เพื่อความถูกต้องของข้อมูลกระทบยอด',
+        v.errors, null);
+      return;
+    }
+    if (v.warnings.length) {
+      showConfirm('warn', 'ตรวจสอบข้อมูลอีกครั้ง',
+        'ระบบพบข้อมูลที่อาจไม่ถูกต้อง คุณต้องการบันทึกตามนี้หรือไม่?',
+        v.warnings, function(){ doSave(date, sales, expClean, recon); });
+      return;
+    }
+    doSave(date, sales, expClean, recon);
   });
 
   /* ---------- Dashboard ---------- */
