@@ -325,6 +325,7 @@
   const DEFAULT_CHANNELS = [
     { key:'cash', label:'เงินสด', group:'store' },
     { key:'transfer', label:'เงินโอน', group:'store' },
+    { key:'thaihelp', label:'ไทยช่วยไทย', group:'store' },
     { key:'lineman', label:'LineMan', group:'delivery' },
     { key:'grab', label:'Grab', group:'delivery' },
     { key:'shopee', label:'ShopeeFood', group:'delivery' },
@@ -357,6 +358,7 @@ const BRAND_LOGOS = {
   const CHAN_BRAND = {
     cash:      {color:'#16A34A', symbol:'฿'},
     transfer:  {color:'#2563EB', symbol:'⇄'},
+    thaihelp:  {color:'#A51931', symbol:'TH'},
     lineman:   {color:'#EC2727', symbol:'L'},
     grab:      {color:'#00B14F', symbol:'G'},
     shopee:    {color:'#EE4D2D', symbol:'S'},
@@ -541,7 +543,7 @@ const BRAND_LOGOS = {
     let html='<div class="kpis">'
       +kpi('sales','ยอดขายรวม',baht(s.totalSales),grow||(s.dayCount+' วัน'))
       +kpi('profit'+(neg?' neg':''),'กำไรสุทธิ',baht(s.netProfit),'รายจ่าย '+baht(s.totalExpenses))
-      +kpi('','เงินสด / โอน',baht(s.cash)+' / '+baht(s.transfer),'หน้าร้าน')
+      +kpi('','หน้าร้านรวม',baht((s.cash||0)+(s.transfer||0)+(s.thaihelp||0)),'สด '+baht(s.cash)+' · โอน '+baht(s.transfer)+(s.thaihelp?' · ไทยช่วยไทย '+baht(s.thaihelp):''))
       +kpi('','Delivery',baht(s.delivery),(s.totalSales?(s.delivery/s.totalSales*100).toFixed(0):0)+'% ของยอด')
       +'</div>';
     let ins='';
