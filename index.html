@@ -88,6 +88,22 @@
   .rcpt-btn.done{color:#fff;background:var(--teal);border-color:var(--teal);}
   .rcpt-btn.alt{color:var(--ink-2);background:#F2EEDD;border-color:#E3D9BC;}
   .rcpt-btn input{display:none;}
+
+  /* Receipt source picker (ถ่ายใหม่ / เลือกจากอัลบั้ม) */
+  .rcpt-sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:65;padding:14px;}
+  .rcpt-sheet.show{display:flex;}
+  .rcpt-sheet .panel{background:#fff;border-radius:18px;max-width:440px;width:100%;overflow:hidden;animation:slideUp .25s;}
+  .rcpt-sheet h4{font-family:'Kanit';font-weight:700;font-size:15px;color:var(--ink);text-align:center;padding:16px 18px 8px;}
+  .rcpt-sheet .opt{display:flex;align-items:center;gap:14px;padding:15px 20px;border-top:1px solid var(--line);cursor:pointer;background:#fff;transition:.12s;}
+  .rcpt-sheet .opt:active{background:#FFF7E0;}
+  .rcpt-sheet .opt .oc{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none;}
+  .rcpt-sheet .opt .oc svg{width:22px;height:22px;color:#fff;}
+  .rcpt-sheet .opt .ot{flex:1;}
+  .rcpt-sheet .opt .ot .tt{font-family:'Kanit';font-weight:600;font-size:15px;color:var(--ink);}
+  .rcpt-sheet .opt .ot .sub{font-size:12px;color:var(--ink-2);margin-top:2px;}
+  .rcpt-sheet .opt.cam .oc{background:linear-gradient(135deg,#3DD5DC,#1B98A4);}
+  .rcpt-sheet .opt.alb .oc{background:linear-gradient(135deg,#FFB04A,#F37316);}
+  .rcpt-sheet .opt.cancel{justify-content:center;color:var(--ink-2);font-family:'Kanit';font-weight:600;padding:14px;}
   .rmv{border:0;background:transparent;color:var(--red);font-size:12.5px;font-weight:600;cursor:pointer;padding:6px;}
   .rcpt-thumb{width:34px;height:34px;border-radius:8px;object-fit:cover;border:1px solid var(--line);}
   .add-exp{width:100%;border:1.5px dashed var(--teal);background:#E6F7F9;color:var(--teal);
@@ -352,6 +368,26 @@
   </div>
 </div>
 
+<!-- Receipt source picker -->
+<div class="rcpt-sheet" id="rcptSheet">
+  <div class="panel">
+    <h4>เพิ่มรูปใบเสร็จ</h4>
+    <div class="opt cam" id="rcptCam">
+      <div class="oc"></div>
+      <div class="ot"><div class="tt">ถ่ายรูปใหม่</div><div class="sub">ใช้กล้องของอุปกรณ์</div></div>
+    </div>
+    <div class="opt alb" id="rcptAlb">
+      <div class="oc"></div>
+      <div class="ot"><div class="tt">เลือกจากอัลบั้ม</div><div class="sub">เลือกรูปที่ถ่ายไว้แล้ว</div></div>
+    </div>
+    <div class="opt cancel" id="rcptCancel">ยกเลิก</div>
+  </div>
+</div>
+
+<!-- Hidden file inputs (ใช้ร่วมกันสำหรับทุกรายการ) -->
+<input type="file" accept="image/*" capture="environment" id="rcptInputCam" style="display:none">
+<input type="file" accept="image/*" id="rcptInputAlb" style="display:none">
+
 <!-- Confirm/Warning modal -->
 <div class="confirm-modal" id="confirmModal">
   <div class="panel">
@@ -451,7 +487,8 @@
     alert:    S+'<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
     check:    S+'<path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
     camera:   S+'<rect x="2" y="6" width="20" height="14" rx="2"/><circle cx="12" cy="13" r="3"/><path d="M8 6l1.5-3h5L16 6"/></svg>',
-    eye:      S+'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>'
+    eye:      S+'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>',
+    image:    S+'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>'
   };
   // ฉีด SVG เข้า element ทุกตัวที่มี data-icon
   document.querySelectorAll('[data-icon]').forEach(function(el){
@@ -569,8 +606,8 @@ const BRAND_LOGOS = {
       let rcptInner;
       if(e.preview){ rcptInner='<img class="rcpt-thumb" src="'+e.preview+'">'; }
       else if(e.existingUrl){ rcptInner='<a class="rcpt-btn done" href="'+e.existingUrl+'" target="_blank">'+ICONS.eye+' ดูใบเสร็จ</a>'; }
-      else { rcptInner='<label class="rcpt-btn">'+ICONS.camera+' แนบใบเสร็จ<input type="file" accept="image/*" data-i="'+idx+'"></label>'; }
-      const reAttach = (e.preview||e.existingUrl)?'<label class="rcpt-btn alt">เปลี่ยน<input type="file" accept="image/*" data-i="'+idx+'"></label>':'';
+      else { rcptInner='<button type="button" class="rcpt-btn" data-rcpt="'+idx+'">'+ICONS.camera+' แนบใบเสร็จ</button>'; }
+      const reAttach = (e.preview||e.existingUrl)?'<button type="button" class="rcpt-btn alt" data-rcpt="'+idx+'">เปลี่ยน</button>':'';
       div.innerHTML=
         '<div class="top">'
         +'<input class="desc" placeholder="รายการ เช่น แป้งวาฟเฟิล" value="'+(e.item||'').replace(/"/g,'&quot;')+'" data-i="'+idx+'" data-f="item">'
@@ -586,15 +623,24 @@ const BRAND_LOGOS = {
         const i=+el.dataset.i; expenses[i][el.dataset.f]=el.value; if(el.dataset.f==='amount') recalc();
       });
     });
-    box.querySelectorAll('input[type=file]').forEach(function(el){
-      el.addEventListener('change',function(){ handleReceipt(el); });
+    box.querySelectorAll('[data-rcpt]').forEach(function(el){
+      el.addEventListener('click',function(){ openReceiptSheet(+el.dataset.rcpt); });
     });
     box.querySelectorAll('[data-rmv]').forEach(function(el){
       el.addEventListener('click',function(){ expenses.splice(+el.dataset.rmv,1); if(!expenses.length) addExpenseItem(); else renderExpenses(); recalc(); });
     });
   }
-  function handleReceipt(el){
-    const i=+el.dataset.i, file=el.files[0]; if(!file) return;
+  let rcptTargetIdx = -1;
+  function openReceiptSheet(idx){
+    rcptTargetIdx = idx;
+    document.getElementById('rcptSheet').classList.add('show');
+  }
+  function closeReceiptSheet(){
+    document.getElementById('rcptSheet').classList.remove('show');
+  }
+  function handleReceiptFile(file){
+    if(!file || rcptTargetIdx < 0) return;
+    const i = rcptTargetIdx;
     const reader=new FileReader();
     reader.onload=function(){
       const dataUrl=reader.result;
@@ -604,6 +650,34 @@ const BRAND_LOGOS = {
     };
     reader.readAsDataURL(file);
   }
+
+  // ผูก event ของ sheet (ครั้งเดียวพอ)
+  document.getElementById('rcptCancel').addEventListener('click', closeReceiptSheet);
+  document.getElementById('rcptSheet').addEventListener('click', function(e){
+    if(e.target === this) closeReceiptSheet();
+  });
+  document.getElementById('rcptCam').addEventListener('click', function(){
+    closeReceiptSheet();
+    document.getElementById('rcptInputCam').click();
+  });
+  document.getElementById('rcptAlb').addEventListener('click', function(){
+    closeReceiptSheet();
+    document.getElementById('rcptInputAlb').click();
+  });
+  document.getElementById('rcptInputCam').addEventListener('change', function(){
+    handleReceiptFile(this.files[0]); this.value=''; // reset ให้เลือกไฟล์ชื่อเดียวกันซ้ำได้
+  });
+  document.getElementById('rcptInputAlb').addEventListener('change', function(){
+    handleReceiptFile(this.files[0]); this.value='';
+  });
+
+  // ใส่ icon ใน sheet (ทำหลัง ICONS โหลด)
+  setTimeout(function(){
+    if(typeof ICONS !== 'undefined'){
+      document.querySelector('#rcptCam .oc').innerHTML = ICONS.camera;
+      document.querySelector('#rcptAlb .oc').innerHTML = ICONS.image;
+    }
+  }, 50);
   document.getElementById('addExp').addEventListener('click',function(){addExpenseItem();});
 
   function recalc(){
