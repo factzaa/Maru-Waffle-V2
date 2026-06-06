@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>รายงานสรุปค่าใช้จ่าย · Maru Waffle</title>
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1A1A1A">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{--yellow:#FFC629;--cream:#FFFCEF;--ink:#1A1A1A;--ink-2:#5A5247;--line:#E8DFC4;--red:#D02C2C;--green:#1E9E50;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;font-family:'Sarabun',sans-serif;background:#FAF6E8;color:var(--ink);min-height:100vh;}
+  .app{max-width:1100px;margin:0 auto;padding:0 0 60px;}
+
+  .head{background:linear-gradient(135deg,#1A1A1A 0%,#2A2620 100%);color:#fff;padding:20px 18px 18px;padding-left:62px;}
+  .head .top{display:flex;align-items:center;gap:12px;}
+  .head .top img{width:44px;height:44px;border-radius:11px;}
+  .head h1{font-family:'Kanit';font-weight:700;font-size:19px;color:#FFC629;margin:0;line-height:1.2;}
+  .head .sub{font-size:12px;color:#D4CFC4;margin-top:2px;}
+  .back-btn{display:inline-flex;align-items:center;gap:6px;background:rgba(255,198,41,.12);color:#FFC629;
+    text-decoration:none;padding:6px 12px;border-radius:8px;font-family:'Kanit';font-weight:600;font-size:13px;margin-top:14px;}
+  .back-btn:hover{background:rgba(255,198,41,.2);}
+
+  .filters{background:#fff;border-radius:0;padding:14px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;
+    box-shadow:0 2px 8px rgba(0,0,0,.05);position:sticky;top:0;z-index:10;}
+  .filters .field{display:flex;flex-direction:column;gap:4px;}
+  .filters label{font-size:11px;color:var(--ink-2);font-weight:600;}
+  .filters input,.filters select{border:1.5px solid var(--line);border-radius:9px;padding:8px 12px;font-size:13px;
+    font-family:'Kanit';background:#fff;}
+  .filters .ranges{display:flex;gap:6px;align-items:flex-end;flex:1;flex-wrap:wrap;}
+  .filters .rg{border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:8px 12px;border-radius:9px;
+    font-family:'Kanit';font-weight:600;font-size:12.5px;cursor:pointer;}
+  .filters .rg.on{background:var(--ink);color:#FFC629;border-color:var(--ink);}
+  .filters .btn-go{background:var(--yellow);color:var(--ink);border:0;font-family:'Kanit';font-weight:700;
+    padding:9px 16px;border-radius:9px;cursor:pointer;font-size:13px;}
+
+  .body{padding:16px 14px;}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-bottom:18px;}
+  .kpi{background:#fff;border-radius:14px;padding:14px 16px;box-shadow:0 2px 8px rgba(0,0,0,.04);}
+  .kpi .l{font-size:11px;color:var(--ink-2);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+  .kpi .v{font-family:'Kanit';font-weight:700;font-size:24px;color:var(--ink);margin-top:4px;}
+  .kpi.red .v{color:var(--red);}
+  .kpi.green .v{color:var(--green);}
+  .kpi .sub{font-size:11px;color:var(--ink-2);margin-top:2px;}
+
+  .group{margin-bottom:24px;}
+  .group-h{font-family:'Kanit';font-weight:700;font-size:14px;color:var(--ink-2);margin:0 4px 10px;
+    display:flex;align-items:center;gap:8px;}
+  .group-h .dot{width:8px;height:8px;border-radius:50%;background:var(--ink);}
+  .group-h .cnt{margin-left:auto;font-weight:500;color:var(--ink-2);font-size:12px;}
+
+  .items{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;}
+  .item{background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.05);
+    display:flex;flex-direction:column;transition:.2s;}
+  .item:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.1);}
+  .item .pic{aspect-ratio:1;background:#F2EEDD url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="%23BFB59A" stroke-width="1.5"%3E%3Crect x="3" y="3" width="18" height="18" rx="2"/%3E%3Ccircle cx="8.5" cy="8.5" r="1.5"/%3E%3Cpolyline points="21 15 16 10 5 21"/%3E%3C/svg%3E') no-repeat center;
+    cursor:pointer;position:relative;background-size:50px;}
+  .item .pic img{width:100%;height:100%;object-fit:cover;display:block;}
+  .item .badge{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.7);color:#fff;font-size:10.5px;
+    font-weight:600;padding:3px 8px;border-radius:6px;font-family:'Kanit';}
+  .item .badge.biz{background:rgba(208,44,44,.85);}
+  .item .info{padding:10px 13px 12px;}
+  .item .nm{font-family:'Kanit';font-weight:600;font-size:14px;color:var(--ink);line-height:1.3;
+    overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .item .meta{display:flex;justify-content:space-between;align-items:center;margin-top:6px;}
+  .item .dt{font-size:11.5px;color:var(--ink-2);}
+  .item .amt{font-family:'Kanit';font-weight:700;font-size:15px;color:var(--red);}
+
+  .empty{text-align:center;padding:40px 20px;color:var(--ink-2);}
+  .empty .ic{font-size:40px;margin-bottom:8px;}
+  .loading{text-align:center;padding:40px;color:var(--ink-2);}
+
+  /* Lightbox */
+  .lightbox{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;
+    z-index:100;padding:18px;cursor:pointer;}
+  .lightbox.show{display:flex;}
+  .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;box-shadow:0 4px 30px rgba(0,0,0,.6);}
+  .lightbox .lb-close{position:absolute;top:18px;right:18px;background:rgba(255,255,255,.15);color:#fff;border:0;
+    width:42px;height:42px;border-radius:50%;font-size:22px;cursor:pointer;backdrop-filter:blur(8px);}
+  .lightbox .lb-info{position:absolute;bottom:18px;left:18px;right:18px;background:rgba(0,0,0,.7);color:#fff;
+    padding:12px 16px;border-radius:12px;backdrop-filter:blur(8px);}
+  .lightbox .lb-info .nm{font-family:'Kanit';font-weight:700;font-size:15px;}
+  .lightbox .lb-info .meta{font-size:12.5px;color:#D4CFC4;margin-top:3px;display:flex;gap:12px;flex-wrap:wrap;}
+  .lightbox .lb-info .amt{color:#FFC629;font-family:'Kanit';font-weight:700;}
+
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1A1A1A;color:#FFC629;
+    padding:12px 18px;border-radius:14px;font-family:'Kanit';font-weight:600;font-size:13.5px;opacity:0;transition:.25s;z-index:50;}
+  .toast.show{opacity:1;}
+
+  @media (max-width:560px){
+    .head .sub{font-size:11px;}
+    .filters{flex-direction:column;align-items:stretch;}
+    .filters .ranges{flex:none;}
+    .summary{grid-template-columns:repeat(2,1fr);}
+    .kpi .v{font-size:18px;}
+    .items{grid-template-columns:repeat(2,1fr);gap:8px;}
+    .item .nm{font-size:13px;}
+    .item .amt{font-size:13.5px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="head">
+    <div class="top">
+      <img src="icon-192.png" alt="">
+      <div>
+        <h1>📋 รายงานสรุปค่าใช้จ่าย</h1>
+        <div class="sub">Maru Waffle · พร้อมหลักฐานทุกรายการ</div>
+      </div>
+    </div>
+    <a class="back-btn" href="index.html">← กลับหน้าหลัก</a>
+  </div>
+
+  <div class="filters">
+    <div class="field">
+      <label>จากวันที่</label>
+      <input type="date" id="fStart">
+    </div>
+    <div class="field">
+      <label>ถึงวันที่</label>
+      <input type="date" id="fEnd">
+    </div>
+    <div class="field">
+      <label>ประเภท</label>
+      <select id="fType">
+        <option value="all">ทั้งหมด</option>
+        <option value="pos">ค่าใช้จ่ายจากรอบขาย (POS)</option>
+        <option value="biz">ค่าใช้จ่ายระหว่างวัน (สั่งของ/วัตถุดิบ)</option>
+      </select>
+    </div>
+    <div class="ranges">
+      <button class="rg" data-r="7">7 วัน</button>
+      <button class="rg on" data-r="30">30 วัน</button>
+      <button class="rg" data-r="month">เดือนนี้</button>
+      <button class="rg" data-r="90">90 วัน</button>
+    </div>
+    <button class="btn-go" id="goLoad">ดูรายงาน</button>
+  </div>
+
+  <div class="body">
+    <div class="summary" id="summary"></div>
+    <div id="results"><div class="loading">กำลังโหลด...</div></div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose">✕</button>
+  <img id="lbImg" alt="">
+  <div class="lb-info" id="lbInfo"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxM4wS8A69veJY-4YTXJg2nbQKC-AaG88VDLSfp_SHX9SsUf2yhd6xv4ICKJPyVHnLDeg/exec';
+
+  function toast(msg){
+    const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+    setTimeout(function(){t.classList.remove('show');},2400);
+  }
+  function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function baht(n){return '฿'+Math.round(Number(n)||0).toLocaleString('en-US');}
+
+  async function api(action, params){
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify(Object.assign({action:action},params||{}))
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    return data;
+  }
+
+  // ตั้งวันที่เริ่มต้น (30 วันย้อนหลัง)
+  function initDates(){
+    const today = new Date();
+    const start = new Date(today); start.setDate(today.getDate()-29);
+    document.getElementById('fStart').value = fmt(start);
+    document.getElementById('fEnd').value = fmt(today);
+  }
+  initDates();
+
+  // Range buttons
+  document.querySelectorAll('.rg').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('.rg').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      const today = new Date();
+      const d = new Date(today);
+      if(b.dataset.r==='7') d.setDate(d.getDate()-6);
+      else if(b.dataset.r==='30') d.setDate(d.getDate()-29);
+      else if(b.dataset.r==='90') d.setDate(d.getDate()-89);
+      else if(b.dataset.r==='month') d.setDate(1);
+      document.getElementById('fStart').value = fmt(d);
+      document.getElementById('fEnd').value = fmt(today);
+      load();
+    });
+  });
+
+  document.getElementById('goLoad').addEventListener('click', load);
+  document.getElementById('fType').addEventListener('change', load);
+
+  function groupByMonth(items){
+    const groups = {};
+    const monthLabels = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    items.forEach(function(e){
+      const parts = e.date.split('-');
+      const key = parts[0]+'-'+parts[1];
+      const label = monthLabels[parseInt(parts[1])-1] + ' ' + (parseInt(parts[0])+543).toString().slice(-2);
+      if(!groups[key]) groups[key] = { label:label, items:[], total:0 };
+      groups[key].items.push(e);
+      groups[key].total += Number(e.amount)||0;
+    });
+    return Object.keys(groups).sort().reverse().map(function(k){return groups[k];});
+  }
+
+  async function load(){
+    const start = document.getElementById('fStart').value;
+    const end = document.getElementById('fEnd').value;
+    const type = document.getElementById('fType').value;
+    document.getElementById('results').innerHTML = '<div class="loading">กำลังโหลด...</div>';
+    document.getElementById('summary').innerHTML = '';
+    try{
+      const res = await api('getExpensesReport', { start:start, end:end, type:type });
+      renderSummary(res.summary, type);
+      renderItems(res.items || []);
+    }catch(err){
+      document.getElementById('results').innerHTML = '<div class="empty"><div class="ic">⚠️</div>โหลดไม่ได้: '+err.message+'</div>';
+    }
+  }
+
+  function renderSummary(s, type){
+    if(!s) return;
+    let html = '';
+    html += '<div class="kpi red"><div class="l">รวมค่าใช้จ่าย</div><div class="v">'+baht(s.total)+'</div><div class="sub">'+s.count+' รายการ</div></div>';
+    if(type === 'all'){
+      html += '<div class="kpi"><div class="l">จากรอบขาย (POS)</div><div class="v">'+baht(s.byType.pos)+'</div></div>';
+      html += '<div class="kpi"><div class="l">สั่งของ/วัตถุดิบ</div><div class="v">'+baht(s.byType.biz)+'</div></div>';
+    }
+    const avg = s.count ? Math.round(s.total/s.count) : 0;
+    html += '<div class="kpi"><div class="l">เฉลี่ย/รายการ</div><div class="v">'+baht(avg)+'</div></div>';
+    document.getElementById('summary').innerHTML = html;
+  }
+
+  function renderItems(items){
+    if(!items.length){
+      document.getElementById('results').innerHTML = '<div class="empty"><div class="ic">📭</div>ไม่มีค่าใช้จ่ายในช่วงที่เลือก</div>';
+      return;
+    }
+    const groups = groupByMonth(items);
+    let html = '';
+    groups.forEach(function(g){
+      html += '<div class="group">';
+      html += '<div class="group-h"><span class="dot"></span>'+g.label+'<span class="cnt">'+g.items.length+' รายการ · รวม '+baht(g.total)+'</span></div>';
+      html += '<div class="items">';
+      g.items.forEach(function(e){
+        const isBiz = e.type === 'biz';
+        const badgeText = isBiz ? 'สั่งของ' : 'POS';
+        const badgeCls = isBiz ? 'badge biz' : 'badge';
+        const pic = e.url
+          ? '<div class="pic" data-img="'+e.url+'" data-nm="'+escapeAttr(e.item)+'" data-dt="'+e.dateDM+'" data-amt="'+e.amount+'"><img src="'+e.url+'" alt="" loading="lazy"><span class="'+badgeCls+'">'+badgeText+'</span></div>'
+          : '<div class="pic"><span class="'+badgeCls+'">'+badgeText+'</span></div>';
+        html += '<div class="item">'+pic
+          +'<div class="info"><div class="nm">'+escapeHtml(e.item||'(ไม่มีชื่อรายการ)')+'</div>'
+          +'<div class="meta"><span class="dt">'+e.dateDM+'</span><span class="amt">'+baht(e.amount)+'</span></div></div></div>';
+      });
+      html += '</div></div>';
+    });
+    document.getElementById('results').innerHTML = html;
+
+    // bind lightbox
+    document.querySelectorAll('.pic[data-img]').forEach(function(el){
+      el.addEventListener('click', function(){ openLightbox(el.dataset.img, el.dataset.nm, el.dataset.dt, el.dataset.amt); });
+    });
+  }
+
+  function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function escapeAttr(s){ return String(s||'').replace(/"/g,'&quot;'); }
+
+  function openLightbox(url, nm, dt, amt){
+    document.getElementById('lbImg').src = url;
+    document.getElementById('lbInfo').innerHTML = '<div class="nm">'+escapeHtml(nm)+'</div><div class="meta"><span>'+dt+'</span><span class="amt">'+baht(amt)+'</span></div>';
+    document.getElementById('lightbox').classList.add('show');
+  }
+  document.getElementById('lightbox').addEventListener('click', function(e){
+    if(e.target === this || e.target.id === 'lbClose') this.classList.remove('show');
+  });
+  document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') document.getElementById('lightbox').classList.remove('show');
+  });
+
+  // Register service worker (PWA support)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  }
+
+  load();
+</script>
+</body>
+</html>
