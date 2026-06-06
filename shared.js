@@ -78,6 +78,7 @@ function buildSidebar(currentPage){
     { page:'stockWithdraw',  href:'stock-withdraw.html',  icon:'edit',    label:'เบิกของ' },
     { page:'stockReceive',   href:'stock-receive.html',   icon:'receipt', label:'รับของเข้า' },
     { page:'stockClose',     href:'stock-close.html',     icon:'check',   label:'ปิดร้าน (สรุปสต๊อก)' },
+    { page:'stockAudit',     href:'stock-audit.html',     icon:'check',   label:'ออดิทสต๊อก' },
     { page:'stockManage',    href:'stock-manage.html',    icon:'edit',    label:'จัดการรายการ' },
   ];
   return items.map(function(it){
