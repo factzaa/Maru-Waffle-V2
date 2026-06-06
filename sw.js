@@ -1,7 +1,7 @@
 // Maru Waffle Service Worker
 // version: bump เลขเมื่ออัปเดต index.html เพื่อให้ client โหลดเวอร์ชันใหม่
-const CACHE_VERSION = 'maru-waffle-v1';
-const CACHE_FILES = ['./', './index.html', './manifest.webmanifest',
+const CACHE_VERSION = 'maru-waffle-v2';
+const CACHE_FILES = ['./', './index.html', './expenses-report.html', './manifest.webmanifest',
                      './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', (event) => {
