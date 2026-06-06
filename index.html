@@ -239,6 +239,48 @@
   .sb-item .si{width:22px;height:22px;flex:none;}
   .sb-item .si svg{width:22px;height:22px;}
   .sb-foot{padding:14px 22px 22px;border-top:1px solid #2A2620;font-size:11px;color:#6B5F4A;}
+  .sb-group{padding:18px 14px 6px;font-size:11px;color:#8A7F6A;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
+
+  /* ===== Stock pages ===== */
+  .stock-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:#fff;border-radius:14px;}
+  .stock-filters input[type=search]{flex:1;min-width:140px;border:1.5px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;font-family:'Kanit';}
+  .stock-cat-chip{border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:20px;font-family:'Kanit';font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap;}
+  .stock-cat-chip.on{background:var(--ink);color:#FFC629;border-color:var(--ink);}
+
+  .stock-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
+  .stock-summary .sk{background:#fff;border-radius:12px;padding:11px 13px;text-align:center;}
+  .stock-summary .sk .v{font-family:'Kanit';font-weight:800;font-size:22px;color:var(--ink);line-height:1;}
+  .stock-summary .sk .l{font-size:11px;color:var(--ink-2);margin-top:3px;}
+  .stock-summary .sk.warn .v{color:#F37316;}
+  .stock-summary .sk.bad  .v{color:var(--red);}
+
+  .stock-list{display:flex;flex-direction:column;gap:8px;}
+  .stock-row{background:#fff;border-radius:12px;padding:11px 14px;display:flex;align-items:center;gap:10px;border-left:4px solid transparent;}
+  .stock-row.low{border-left-color:#F37316;background:#FFFBEB;}
+  .stock-row.out{border-left-color:var(--red);background:#FEF2F2;}
+  .stock-row .info{flex:1;min-width:0;}
+  .stock-row .nm{font-family:'Kanit';font-weight:600;font-size:14px;color:var(--ink);}
+  .stock-row .meta{font-size:11.5px;color:var(--ink-2);margin-top:1px;display:flex;gap:8px;flex-wrap:wrap;}
+  .stock-row .meta .pill{background:#F2EEDD;color:var(--ink-2);padding:1px 7px;border-radius:8px;font-size:10.5px;font-weight:600;}
+  .stock-row .meta .pill.mode-count{background:#FEF3C7;color:#92400E;}
+  .stock-row .bal{text-align:right;flex:none;}
+  .stock-row .bal .n{font-family:'Kanit';font-weight:800;font-size:18px;color:var(--ink);line-height:1;}
+  .stock-row .bal .u{font-size:11px;color:var(--ink-2);}
+  .stock-row.low .bal .n{color:#F37316;}
+  .stock-row.out .bal .n{color:var(--red);}
+  .stock-row .alert{font-size:11px;color:#F37316;font-weight:700;}
+
+  /* Manage page item card */
+  .mg-row{background:#fff;border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+  .mg-row .top{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;}
+  .mg-row .top .nm{flex:1;font-family:'Kanit';font-weight:600;font-size:14px;color:var(--ink);}
+  .mg-row .top .id{font-size:11px;color:var(--ink-2);font-family:monospace;}
+  .mg-row .fields{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;align-items:end;}
+  .mg-row .fields label{font-size:11px;color:var(--ink-2);font-weight:600;display:block;margin-bottom:3px;}
+  .mg-row .fields input,.mg-row .fields select{width:100%;border:1.5px solid var(--line);border-radius:9px;padding:7px 10px;font-size:13px;font-family:'Kanit';background:#fff;}
+  .mg-row .fields input[type=number]{text-align:right;font-weight:600;}
+  .mg-row .saved-tick{color:var(--green-ok);font-size:11px;font-weight:700;display:none;}
+  .mg-row.saved .saved-tick{display:inline;}
 
   /* ปุ่มปิด sidebar ในหัว */
   .sb-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;border:0;
@@ -338,6 +380,9 @@
     <a class="sb-item" data-page="bizexp"><span class="si" data-icon="receipt"></span>บันทึกค่าใช้จ่าย</a>
     <a class="sb-item" data-page="dash"><span class="si" data-icon="dash"></span>แดชบอร์ดยอดขาย</a>
     <a class="sb-item" href="expenses-report.html"><span class="si" data-icon="trend"></span>รายงานสรุปค่าใช้จ่าย</a>
+    <div class="sb-group">📦 สต๊อกสินค้า</div>
+    <a class="sb-item" data-page="stockView"><span class="si" data-icon="store"></span>ตรวจสต๊อก</a>
+    <a class="sb-item" data-page="stockManage"><span class="si" data-icon="edit"></span>จัดการรายการ</a>
   </nav>
   <div class="sb-foot">🐤 ข้อมูลทั้งหมดเก็บใน Google Sheet ของคุณ</div>
 </aside>
@@ -439,6 +484,49 @@
         <a href="expenses-report.html" class="btn" style="margin-top:14px;background:transparent;color:var(--ink);border:2px solid var(--line);box-shadow:none;text-align:center;display:block;text-decoration:none;">
           📋 ดูรายงานสรุปทั้งหมด (พร้อมหลักฐาน)
         </a>
+      </div>
+    </section>
+
+    <!-- ===== ตรวจสต๊อก ===== -->
+    <section id="tab-stockView" class="hidden">
+      <div class="card">
+        <div class="h"><span class="ic" style="background:linear-gradient(135deg,#3DD5DC,#1B98A4);" data-icon="store"></span>คงเหลือสต๊อก</div>
+        <div class="stock-summary" id="stockSummary"></div>
+        <div class="stock-filters">
+          <input type="search" id="stockSearch" placeholder="ค้นหารายการ...">
+        </div>
+        <div class="stock-filters" id="stockCatChips" style="background:transparent;padding:0;margin-top:-4px;">
+          <button class="stock-cat-chip on" data-cat="all">ทั้งหมด</button>
+          <button class="stock-cat-chip" data-cat="Waffle">🧁 Waffle</button>
+          <button class="stock-cat-chip" data-cat="KUFF">🥐 KUFF</button>
+          <button class="stock-cat-chip" data-cat="Drink">🥤 Drink</button>
+          <button class="stock-cat-chip" data-cat="Other">📦 อื่นๆ</button>
+          <button class="stock-cat-chip" data-cat="low" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;">⚠️ ของใกล้หมด</button>
+        </div>
+        <div class="stock-list" id="stockList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
+      </div>
+    </section>
+
+    <!-- ===== จัดการรายการ ===== -->
+    <section id="tab-stockManage" class="hidden">
+      <div class="card">
+        <div class="h"><span class="ic" style="background:linear-gradient(135deg,#A78BFA,#6D28D9);" data-icon="edit"></span>จัดการรายการสต๊อก</div>
+        <p style="font-size:13px;color:var(--ink-2);margin-bottom:14px;line-height:1.55;">
+          ตั้งค่า <b>สต๊อกขั้นต่ำ</b> (สำหรับแจ้งเตือนของใกล้หมด) และ <b>โหมด</b> ของแต่ละรายการ
+          <br>· <b>withdraw</b> = คีย์เบิกระหว่างวัน (ของชิ้น/ถุง/ขวด)
+          <br>· <b>count</b> = นับคงเหลือสิ้นวัน (ของชั่งกรัม/ml)
+        </p>
+        <div class="stock-filters" id="mgrCatChips" style="background:transparent;padding:0;">
+          <button class="stock-cat-chip on" data-cat="all">ทั้งหมด</button>
+          <button class="stock-cat-chip" data-cat="Waffle">🧁 Waffle</button>
+          <button class="stock-cat-chip" data-cat="KUFF">🥐 KUFF</button>
+          <button class="stock-cat-chip" data-cat="Drink">🥤 Drink</button>
+          <button class="stock-cat-chip" data-cat="Other">📦 อื่นๆ</button>
+        </div>
+        <div class="stock-filters">
+          <input type="search" id="mgrSearch" placeholder="ค้นหารายการ...">
+        </div>
+        <div id="mgrList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
       </div>
     </section>
 
@@ -635,7 +723,7 @@
 
   // page switching
   function showPage(name){
-    ['report','bizexp','dash'].forEach(function(p){
+    ['report','bizexp','dash','stockView','stockManage'].forEach(function(p){
       const el = document.getElementById('tab-'+p);
       if(el) el.classList.toggle('hidden', p!==name);
     });
@@ -644,6 +732,8 @@
     });
     if(name==='dash') loadDashboard();
     if(name==='bizexp') loadBizRecent();
+    if(name==='stockView') loadStockView();
+    if(name==='stockManage') loadStockManage();
     window.scrollTo({top:0,behavior:'smooth'});
   }
   document.querySelectorAll('.sb-item[data-page]').forEach(function(a){
@@ -734,6 +824,155 @@
         document.getElementById('bizRecentList').innerHTML = '<div style="color:var(--red);font-size:13px;padding:10px;">โหลดไม่ได้: '+err.message+'</div>';
       });
   }
+
+  // ============================================================
+  // ============ STOCK MANAGEMENT (ดู + จัดการรายการ) ============
+  // ============================================================
+
+  // --- ตรวจสต๊อก ---
+  let stockData = { items: [], summary: {}, filter: { cat: 'all', q: '' } };
+
+  function loadStockView(){
+    document.getElementById('stockList').innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div>';
+    api('getStockBalances', {})
+      .then(function(res){
+        stockData.items = res.items || [];
+        stockData.summary = res.summary || {};
+        renderStockSummary();
+        renderStockList();
+      })
+      .catch(function(err){
+        document.getElementById('stockList').innerHTML = '<div style="color:var(--red);padding:14px;font-size:13px;">โหลดไม่ได้: '+err.message+'<br><br>ถ้ายังไม่ได้รัน <code>setupStock</code> ใน Apps Script editor → ให้รันก่อน</div>';
+      });
+  }
+  function renderStockSummary(){
+    const s = stockData.summary;
+    document.getElementById('stockSummary').innerHTML =
+      '<div class="sk"><div class="v">'+(s.total||0)+'</div><div class="l">รายการทั้งหมด</div></div>'
+      +'<div class="sk warn"><div class="v">'+(s.lowStock||0)+'</div><div class="l">⚠️ ใกล้หมด</div></div>'
+      +'<div class="sk bad"><div class="v">'+(s.outOfStock||0)+'</div><div class="l">🚫 หมดสต๊อก</div></div>';
+  }
+  function renderStockList(){
+    const q = (stockData.filter.q || '').toLowerCase();
+    const cat = stockData.filter.cat;
+    const filtered = stockData.items.filter(function(it){
+      if(!it.active) return false;
+      if(cat === 'low')   { if(!it.lowStock && it.balance > 0) return false; }
+      else if(cat !== 'all') { if(it.category !== cat) return false; }
+      if(q && it.name.toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    const box = document.getElementById('stockList');
+    if(!filtered.length){
+      box.innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">ไม่พบรายการ</div>';
+      return;
+    }
+    box.innerHTML = filtered.map(function(it){
+      const cls = it.balance <= 0 ? 'out' : (it.lowStock ? 'low' : '');
+      const modePill = it.mode === 'count'
+        ? '<span class="pill mode-count">ชั่ง/นับ</span>'
+        : '<span class="pill">เบิก</span>';
+      const meta = '<span>'+it.category+'</span>'+modePill
+        +(it.minStock>0 ? '<span>ขั้นต่ำ '+it.minStock+' '+it.unit+'</span>' : '');
+      const todayInfo = (it.todayWithdraw>0 || it.todayReceive>0)
+        ? '<div style="font-size:11px;color:var(--ink-2);margin-top:2px;">วันนี้: '
+          +(it.todayReceive>0?'<span style="color:var(--green-ok);">+'+it.todayReceive+'</span> ':'')
+          +(it.todayWithdraw>0?'<span style="color:var(--red);">-'+it.todayWithdraw+'</span>':'')
+          +'</div>'
+        : '';
+      return '<div class="stock-row '+cls+'">'
+        +'<div class="info"><div class="nm">'+it.name+'</div><div class="meta">'+meta+'</div>'+todayInfo+'</div>'
+        +'<div class="bal"><div class="n">'+it.balance+'</div><div class="u">'+it.unit+'</div></div>'
+        +'</div>';
+    }).join('');
+  }
+
+  document.getElementById('stockSearch').addEventListener('input', function(){
+    stockData.filter.q = this.value; renderStockList();
+  });
+  document.querySelectorAll('#stockCatChips .stock-cat-chip').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#stockCatChips .stock-cat-chip').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      stockData.filter.cat = b.dataset.cat;
+      renderStockList();
+    });
+  });
+
+  // --- จัดการรายการ ---
+  let mgrData = { items: [], filter: { cat: 'all', q: '' } };
+
+  function loadStockManage(){
+    document.getElementById('mgrList').innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div>';
+    api('getStockItems', {})
+      .then(function(res){ mgrData.items = res.items || []; renderMgrList(); })
+      .catch(function(err){
+        document.getElementById('mgrList').innerHTML = '<div style="color:var(--red);padding:14px;font-size:13px;">โหลดไม่ได้: '+err.message+'<br><br>ถ้ายังไม่ได้รัน <code>setupStock</code> ใน Apps Script ให้รันก่อน</div>';
+      });
+  }
+  function renderMgrList(){
+    const q = (mgrData.filter.q || '').toLowerCase();
+    const cat = mgrData.filter.cat;
+    const filtered = mgrData.items.filter(function(it){
+      if(cat !== 'all' && it.category !== cat) return false;
+      if(q && it.name.toLowerCase().indexOf(q) < 0) return false;
+      return true;
+    });
+    const box = document.getElementById('mgrList');
+    if(!filtered.length){ box.innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">ไม่พบรายการ</div>'; return; }
+    box.innerHTML = filtered.map(function(it){
+      return '<div class="mg-row" data-id="'+it.id+'">'
+        +'<div class="top"><div class="nm">'+it.name+'</div><div class="id">'+it.id+'</div></div>'
+        +'<div class="fields">'
+          +'<div><label>หน่วย</label><input type="text" data-f="unit" value="'+it.unit+'"></div>'
+          +'<div><label>โหมด</label><select data-f="mode"><option value="withdraw"'+(it.mode==='withdraw'?' selected':'')+'>คีย์เบิก (ของชิ้น)</option><option value="count"'+(it.mode==='count'?' selected':'')+'>นับสิ้นวัน (กรัม/ml)</option></select></div>'
+          +'<div><label>สต๊อกขั้นต่ำ (เตือนใกล้หมด)</label><input type="number" min="0" step="any" data-f="minStock" value="'+it.minStock+'"></div>'
+          +'<div><label>สถานะ</label><select data-f="active"><option value="true"'+(it.active!==false?' selected':'')+'>ใช้งาน</option><option value="false"'+(it.active===false?' selected':'')+'>หยุดใช้</option></select></div>'
+        +'</div>'
+        +'<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px;align-items:center;">'
+          +'<span class="saved-tick">✓ บันทึกแล้ว</span>'
+          +'<button type="button" class="rcpt-btn done mg-save" data-id="'+it.id+'">บันทึก</button>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+    box.querySelectorAll('.mg-save').forEach(function(btn){
+      btn.addEventListener('click', function(){ saveMgrItem(btn.dataset.id); });
+    });
+  }
+  function saveMgrItem(id){
+    const row = document.querySelector('.mg-row[data-id="'+id+'"]'); if(!row) return;
+    const data = { id: id };
+    row.querySelectorAll('[data-f]').forEach(function(el){
+      const f = el.dataset.f;
+      if(f === 'active') data[f] = el.value === 'true';
+      else if(f === 'minStock') data[f] = parseFloat(el.value)||0;
+      else data[f] = el.value;
+    });
+    const btn = row.querySelector('.mg-save'); btn.disabled=true; btn.textContent='กำลังบันทึก...';
+    api('saveStockItem', { data: data })
+      .then(function(res){
+        btn.disabled=false; btn.textContent='บันทึก';
+        row.classList.add('saved');
+        setTimeout(function(){ row.classList.remove('saved'); }, 2000);
+        const idx = mgrData.items.findIndex(function(x){return x.id===id;});
+        if(idx>=0) Object.assign(mgrData.items[idx], data);
+      })
+      .catch(function(err){
+        btn.disabled=false; btn.textContent='บันทึก';
+        toast('ผิดพลาด: '+err.message);
+      });
+  }
+  document.getElementById('mgrSearch').addEventListener('input', function(){
+    mgrData.filter.q = this.value; renderMgrList();
+  });
+  document.querySelectorAll('#mgrCatChips .stock-cat-chip').forEach(function(b){
+    b.addEventListener('click', function(){
+      document.querySelectorAll('#mgrCatChips .stock-cat-chip').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on');
+      mgrData.filter.cat = b.dataset.cat;
+      renderMgrList();
+    });
+  });
 
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxM4wS8A69veJY-4YTXJg2nbQKC-AaG88VDLSfp_SHX9SsUf2yhd6xv4ICKJPyVHnLDeg/exec';
   async function api(action, params){
