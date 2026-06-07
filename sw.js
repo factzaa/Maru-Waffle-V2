@@ -1,10 +1,11 @@
 // Maru Waffle Service Worker
 // version: bump เลขเมื่ออัปเดต index.html เพื่อให้ client โหลดเวอร์ชันใหม่
-const CACHE_VERSION = 'maru-waffle-v6';
+const CACHE_VERSION = 'maru-waffle-v7';
 const CACHE_FILES = ['./', './index.html', './expenses-report.html',
                      './stock-view.html', './stock-withdraw.html', './stock-receive.html',
                      './stock-close.html', './stock-audit.html', './stock-manage.html',
                      './attend.html', './attend-report.html', './attend-setup.html',
+                     './manual.html',
                      './shared.css', './shared.js',
                      './manifest.webmanifest',
                      './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
