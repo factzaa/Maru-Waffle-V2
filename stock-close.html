@@ -127,10 +127,10 @@ function render(){
   const box = document.getElementById('clList');
   if(!filtered.length){ box.innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">ไม่พบรายการ</div>'; return; }
   box.innerHTML = filtered.map(function(it){
-    // opening = คงเหลือก่อนวันนี้ = balance + todayWithdraw - todayReceive
-    const open = it.balance + it.todayWithdraw - it.todayReceive;
-    const recv = it.todayReceive;
-    const used = it.todayWithdraw;
+    // opening = คงเหลือยกมาจากวันก่อน, รับ/เบิก = ยอดจริงทั้งวันนี้ (ตรงกับที่ปิดรอบคำนวณ)
+    const open = it.prevClose || 0;
+    const recv = it.dayReceive || 0;
+    const used = it.dayWithdraw || 0;
     const waste = parseFloat(cl.wastes[it.id])||0;
     const cVal = cl.closings[it.id];
     let calcLine = '';
