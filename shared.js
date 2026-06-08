@@ -69,9 +69,10 @@ function bindSidebar(){
 // ---- Build standard sidebar (เรียกในทุกหน้า — มาร์ค active ตาม attr current) ----
 function buildSidebar(currentPage){
   const items = [
-    { page:'report',         href:'index.html',           icon:'edit',    label:'บันทึกรายงานสิ้นวัน' },
-    { page:'bizexp',         href:'index.html#bizexp',    icon:'receipt', label:'บันทึกค่าใช้จ่าย' },
-    { page:'dash',           href:'index.html#dash',      icon:'dash',    label:'แดชบอร์ดยอดขาย' },
+    { page:'home',           href:'index.html',           icon:'dash',    label:'🏠 หน้าแรก' },
+    { page:'report',         href:'records.html#report',  icon:'edit',    label:'บันทึกรายงานสิ้นวัน' },
+    { page:'bizexp',         href:'records.html#bizexp',  icon:'receipt', label:'บันทึกค่าใช้จ่าย' },
+    { page:'dash',           href:'records.html#dash',    icon:'dash',    label:'แดชบอร์ดยอดขาย' },
     { page:'expreport',      href:'expenses-report.html', icon:'trend',   label:'รายงานสรุปค่าใช้จ่าย' },
     { group: '📦 สต๊อกสินค้า' },
     { page:'stockDashboard', href:'stock-dashboard.html', icon:'dash',    label:'แดชบอร์ดสต๊อก' },
