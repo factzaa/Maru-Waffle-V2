@@ -30,9 +30,14 @@
   font-size:13px;font-family:'Kanit';font-weight:700;text-align:right;background:#fff;}
 .close-row .fields input.closing{border-color:#FCD34D;background:#FEF9E7;}
 .close-row .calc{font-size:11px;color:var(--ink-2);margin-top:3px;grid-column:1/-1;border-top:1px dashed var(--line);padding-top:3px;}
-.close-row .calc b.use{color:var(--red);}
+.close-row .calc b.use{color:var(--ink);}
 .close-row .calc b.left{color:var(--green);}
-.close-row .calc b.diff{color:#F37316;}
+.close-row .calc b.diff{color:var(--red);}
+.close-row .meta b.m-open{color:var(--ink);}
+.close-row .meta b.m-recv{color:var(--green);}
+.close-row .meta b.m-used{color:#CA8A04;}
+.close-row .calc .auto-tag{color:var(--ink-2);font-size:10px;}
+.close-row .fields input.closing.is-auto{color:#92400E;background:#FFFBEB;border-style:dashed;}
 
 .close-info{background:linear-gradient(135deg,#FEF3C7,#FDE68A);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:12.5px;color:#78350F;line-height:1.6;}
 .close-info b{color:#92400E;}
@@ -115,6 +120,31 @@ function load(){
     });
 }
 
+// อัปเดตเฉพาะแถวเดียว (ไม่ render ใหม่ทั้งหมด → พิมพ์ลื่น focus ไม่หลุด)
+function updateRow(id){
+  const it = cl.balances.find(function(x){return x.id===id;});
+  if(!it) return;
+  const row = document.querySelector('.close-row[data-id="'+id+'"]'); if(!row) return;
+  const open = it.prevClose||0, recv = it.dayReceive||0, used = it.dayWithdraw||0;
+  const waste = parseFloat(cl.wastes[id])||0;
+  const autoClosing = Math.round((open + recv - used - waste)*100)/100;
+  const isAuto = (cl.closings[id] === undefined);
+  const closingNum = isAuto ? autoClosing : (parseFloat(cl.closings[id])||0);
+  const inp = row.querySelector('input[data-f="closing"]');
+  if(inp){
+    inp.classList.toggle('is-auto', isAuto);
+    if(isAuto && document.activeElement !== inp) inp.value = autoClosing; // เติมค่าอัตโนมัติ (ไม่ทับขณะพิมพ์)
+  }
+  const actUse = open + recv - closingNum - waste;
+  const diff = actUse - used;
+  const calcEl = row.querySelector('.calc');
+  if(calcEl){
+    calcEl.innerHTML = 'ใช้จริง <b class="use">'+actUse.toFixed(2)+'</b> · คงเหลือ <b class="left">'+closingNum.toFixed(2)+'</b>'
+      + (Math.abs(diff)>0.01 ? ' · ส่วนต่าง <b class="diff">'+(diff>0?'+':'')+diff.toFixed(2)+'</b>' : '')
+      + (isAuto ? ' <span class="auto-tag">(อัตโนมัติ)</span>' : '');
+  }
+}
+
 function render(){
   const q = (cl.filter.q||'').toLowerCase();
   const cat = cl.filter.cat;
@@ -132,18 +162,15 @@ function render(){
     const recv = it.dayReceive || 0;
     const used = it.dayWithdraw || 0;
     const waste = parseFloat(cl.wastes[it.id])||0;
-    const cVal = cl.closings[it.id];
-    let calcLine = '';
-    if (cVal !== undefined && cVal !== '') {
-      const closing = parseFloat(cVal)||0;
-      const actUse = open + recv - closing - waste;
-      const diff = actUse - used;
-      calcLine = 'ใช้จริง <b class="use">'+actUse.toFixed(2)+'</b> · คงเหลือ <b class="left">'+closing.toFixed(2)+'</b>'
-        + (Math.abs(diff)>0.01 ? ' · ส่วนต่าง <b class="diff">'+(diff>0?'+':'')+diff.toFixed(2)+'</b>' : '');
-    } else {
-      const closing = open + recv - used - waste;
-      calcLine = 'คงเหลือ (คำนวณ) <b class="left">'+closing.toFixed(2)+'</b>';
-    }
+    const autoClosing = Math.round((open + recv - used - waste)*100)/100;  // คงเหลือคำนวณอัตโนมัติ
+    const isAuto = (cl.closings[it.id] === undefined);                      // ยังไม่แตะ = ใช้ค่าอัตโนมัติ
+    const cVal = isAuto ? autoClosing : cl.closings[it.id];
+    const closingNum = parseFloat(cVal)||0;
+    const actUse = open + recv - closingNum - waste;
+    const diff = actUse - used;
+    const calcLine = 'ใช้จริง <b class="use">'+actUse.toFixed(2)+'</b> · คงเหลือ <b class="left">'+closingNum.toFixed(2)+'</b>'
+      + (Math.abs(diff)>0.01 ? ' · ส่วนต่าง <b class="diff">'+(diff>0?'+':'')+diff.toFixed(2)+'</b>' : '')
+      + (isAuto ? ' <span class="auto-tag">(อัตโนมัติ)</span>' : '');
     const cls = it.mode==='count' ? 'count-mode' : '';
     const modePill = it.mode==='count'
       ? '<span class="mp count">ชั่ง</span>'
@@ -151,27 +178,32 @@ function render(){
     return '<div class="close-row '+cls+'" data-id="'+it.id+'">'
       +'<div>'
         +'<div class="nm">'+escHtml(it.name)+'<span class="u">('+escHtml(it.unit)+')</span>'+modePill+'</div>'
-        +'<div class="meta">เปิด <b>'+open.toFixed(2)+'</b> · รับเข้า <b>'+recv.toFixed(2)+'</b> · เบิก <b>'+used.toFixed(2)+'</b></div>'
+        +'<div class="meta">เปิด <b class="m-open">'+open.toFixed(2)+'</b> · รับเข้า <b class="m-recv">'+recv.toFixed(2)+'</b> · เบิก <b class="m-used">'+used.toFixed(2)+'</b></div>'
       +'</div>'
       +'<div class="fields">'
         +'<div class="grp"><span class="lbl">ของเสีย</span><input type="number" inputmode="decimal" step="any" min="0" data-f="waste" data-id="'+it.id+'" value="'+(cl.wastes[it.id]||'')+'" placeholder="0"></div>'
-        +'<div class="grp"><span class="lbl">คงเหลือ'+(it.mode==='count'?' *':'')+'</span><input type="number" inputmode="decimal" step="any" min="0" data-f="closing" data-id="'+it.id+'" value="'+(cVal||'')+'" placeholder="-" class="closing"></div>'
+        +'<div class="grp"><span class="lbl">คงเหลือ'+(it.mode==='count'?' *':'')+'</span><input type="number" inputmode="decimal" step="any" min="0" data-f="closing" data-id="'+it.id+'" value="'+escHtml(String(cVal))+'" placeholder="-" class="closing'+(isAuto?' is-auto':'')+'"></div>'
       +'</div>'
       +'<div class="calc">'+calcLine+'</div>'
     +'</div>';
   }).join('');
   box.querySelectorAll('input[data-f]').forEach(function(inp){
     inp.addEventListener('input', function(){
-      const id = inp.dataset.id; const f = inp.dataset.f;
+      const id = inp.dataset.id, f = inp.dataset.f;
       if(inp.value === '' || isNaN(parseFloat(inp.value))){
         if(f==='waste') delete cl.wastes[id];
-        else delete cl.closings[id];
+        else delete cl.closings[id];   // ลบค่าที่กรอก = กลับไปใช้อัตโนมัติ
       } else {
         if(f==='waste') cl.wastes[id] = inp.value;
         else cl.closings[id] = inp.value;
       }
-      render();
+      updateRow(id);   // อัปเดตเฉพาะแถวนี้ ไม่ render ใหม่ทั้งหมด
     });
+    if(inp.dataset.f === 'closing'){
+      inp.addEventListener('blur', function(){
+        if(cl.closings[inp.dataset.id] === undefined) updateRow(inp.dataset.id); // เว้นว่าง → เติมค่าอัตโนมัติกลับ
+      });
+    }
   });
   document.getElementById('clCount').textContent = cl.balances.length;
 }
@@ -195,7 +227,7 @@ document.getElementById('clSaveBtn').addEventListener('click', function(){
     return it.mode==='count' && (cl.closings[it.id]===undefined || cl.closings[it.id]==='');
   });
   if(missing.length){
-    if(!confirm('มีรายการที่ต้องนับ '+missing.length+' รายการยังไม่ได้กรอกคงเหลือ ปิดรอบเลยหรือไม่?')) return;
+    if(!confirm('มีรายการชั่ง '+missing.length+' รายการยังไม่ได้ยืนยันคงเหลือ (จะใช้ค่าอัตโนมัติ)\nปิดรอบเลยหรือไม่?')) return;
   }
   const btn = this; btn.disabled=true; btn.textContent='กำลังปิดรอบ...';
   api('closeDailyStock', { data: {
