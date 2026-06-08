@@ -162,6 +162,26 @@ function calcStatus(it){
   return { status:'under', diff:diff };
 }
 
+// อัปเดตเฉพาะแถวเดียว (แถบสี + diff pill + summary) โดยไม่ render ใหม่ทั้งหมด → พิมพ์ลื่น focus ไม่หลุด
+function updateAuditRow(id){
+  const it = au.balances.find(function(x){return x.id===id;});
+  if(!it) return;
+  const row = document.querySelector('.audit-row[data-id="'+id+'"]');
+  if(!row) return;
+  const st = calcStatus(it);
+  row.className = 'audit-row ' + (st ? ('has-input '+st.status) : '');
+  const area = row.querySelector('.input-area');
+  let pill = area ? area.querySelector('.diff-pill') : null;
+  if(st){
+    const diffLabel = Math.abs(st.diff)<0.01 ? '✓ ตรง' : (st.diff>0?'+':'')+st.diff;
+    if(!pill && area){ pill = document.createElement('span'); pill.className='diff-pill'; area.appendChild(pill); }
+    if(pill) pill.textContent = diffLabel;
+  } else if(pill){
+    pill.remove();
+  }
+  updateSummary();
+}
+
 function render(){
   const q = (au.filter.q||'').toLowerCase();
   const cat = au.filter.cat;
@@ -203,7 +223,7 @@ function render(){
       if(f === 'actual'){
         if(inp.value === '') delete au.actuals[id];
         else au.actuals[id] = inp.value;
-        render(); // re-render เพื่ออัปเดต status pill + summary
+        updateAuditRow(id); // อัปเดตเฉพาะแถวนี้ — พิมพ์ได้ต่อเนื่อง focus ไม่หลุด
       } else if(f === 'reason'){
         if(inp.value === '') delete au.reasons[id];
         else au.reasons[id] = inp.value;
