@@ -144,10 +144,25 @@
 <div class="modal" id="delModal">
   <div class="body">
     <h3>🗑 ลบรายการ <button class="close-x" id="delClose">✕</button></h3>
-    <div id="delMsg" class="confirm-msg"></div>
-    <div class="actions">
-      <button class="cancel" id="delCancel">ยกเลิก</button>
-      <button class="ok-del" id="delConfirm">ยืนยันลบ</button>
+    <div id="delLoading" style="text-align:center;padding:20px;color:var(--ink-2);">กำลังตรวจสอบประวัติ...</div>
+    <div id="delContent" style="display:none;">
+      <div id="delHeader" style="background:#1A1A1A;color:#fff;padding:11px 13px;border-radius:11px;margin-bottom:12px;">
+        <div style="font-family:'Kanit';font-weight:700;font-size:15px;" id="delItemName">-</div>
+        <div style="font-size:11.5px;color:#D4CFC4;margin-top:2px;" id="delItemMeta">-</div>
+      </div>
+      <div id="delUsageInfo" style="margin-bottom:12px;font-size:13px;line-height:1.55;"></div>
+      <div id="delConfirmInput" style="display:none;margin-bottom:12px;">
+        <label style="font-size:12px;color:var(--ink-2);font-weight:600;display:block;margin-bottom:5px;">
+          🔒 พิมพ์ชื่อรายการเพื่อยืนยันลบถาวร:
+        </label>
+        <input type="text" id="delConfirmName" placeholder="พิมพ์ชื่อรายการ" autocomplete="off"
+          style="width:100%;border:2px solid #EF4444;border-radius:10px;padding:9px 12px;font-size:14px;font-family:'Kanit';background:#FFFAFA;box-sizing:border-box;">
+        <div style="font-size:11px;color:var(--ink-2);margin-top:4px;">พิมพ์ให้ตรงเปะเพื่อยืนยัน</div>
+      </div>
+      <div class="actions">
+        <button class="cancel" id="delCancel">ยกเลิก</button>
+        <button id="delConfirm" class="ok-del" disabled>กรุณารอ...</button>
+      </div>
     </div>
   </div>
 </div>
@@ -161,8 +176,7 @@ let mgrData = { items: [], filter: { cat: 'all', q: '' } };
 
 function loadStockManage(){
   document.getElementById('mgrList').innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div>';
-  api('getStockItems', {})
-    .then(function(res){ mgrData.items = res.items || []; renderMgrList(); })
+  apiSWR('getStockItems', {}, function(res){ mgrData.items = res.items || []; renderMgrList(); })
     .catch(function(err){
       document.getElementById('mgrList').innerHTML = '<div style="color:var(--red);padding:14px;font-size:13px;">โหลดไม่ได้: '+escHtml(err.message)+'<br><br>ถ้ายังไม่ได้รัน <code>setupStock</code> ใน Apps Script ให้รันก่อน</div>';
     });
@@ -296,17 +310,95 @@ $('addSubmit').addEventListener('click', function(){
 });
 
 // ===== Delete Item Modal =====
-let pendingDelete = { id: '', name: '' };
+let pendingDelete = { id: '', name: '', canHardDelete: false };
+let delCooldownTimer = null;
 
 function openDeleteModal(id, name){
-  pendingDelete = { id: id, name: name };
-  $('delMsg').innerHTML = 'ต้องการลบ <b>"'+escHtml(name)+'"</b> (' + id + ') หรือไม่?<br><br>'
-    + '<b>ปิดใช้งานเท่านั้น</b> (soft delete) — ของจะหายจากเมนูแต่ประวัติเก่ายังอยู่ในระบบ<br>'
-    + 'ถ้าต้องการลบถาวร: ถ้าไม่เคยมีประวัติ เบิก/รับเข้า/ปิดร้าน ระบบจะลบ row จริงให้ทันที';
-  $('delConfirm').textContent = 'ปิดใช้งาน / ลบ';
+  pendingDelete = { id: id, name: name, canHardDelete: false };
+  // เปิด modal โหลด state ก่อน
+  $('delLoading').style.display = '';
+  $('delContent').style.display = 'none';
+  $('delConfirm').disabled = true;
+  $('delConfirm').textContent = 'กรุณารอ...';
+  $('delConfirmInput').style.display = 'none';
+  $('delConfirmName').value = '';
   $('delModal').classList.add('show');
+
+  // เช็คประวัติของ item
+  api('checkStockItemUsage', { id: id })
+    .then(function(res){
+      $('delLoading').style.display = 'none';
+      $('delContent').style.display = '';
+
+      const it = res.item;
+      const u = res.usage;
+      pendingDelete.canHardDelete = res.canHardDelete;
+
+      $('delItemName').textContent = it.name + ' (' + it.id + ')';
+      $('delItemMeta').innerHTML = 'หมวด: ' + escHtml(it.category) + ' · หน่วย: ' + escHtml(it.unit)
+        + ' · คงเหลือ: <b style="color:#FFC629;">' + res.balance + '</b>';
+
+      let infoHtml = '';
+      if (res.canHardDelete) {
+        // ไม่มีประวัติ → จะลบถาวร — บังคับ type-to-confirm
+        infoHtml = '<div style="background:#FEE2E2;border-left:3px solid #EF4444;padding:11px 13px;border-radius:10px;color:#7F1D1D;">'
+          +'<b>⚠️ จะลบถาวรออกจากระบบ</b><br>'
+          +'รายการนี้<b>ไม่เคยมีประวัติ</b>การเบิก/รับ/ปิดร้าน/ออดิท จะลบ row จริงในชีต — <b>ไม่สามารถกู้คืนได้</b>'
+          +'</div>';
+        $('delConfirmInput').style.display = '';
+        $('delConfirm').textContent = '🗑 ลบถาวร';
+      } else {
+        // มีประวัติ → soft delete เท่านั้น
+        const breakdown = [];
+        if (u.withdraw > 0) breakdown.push('เบิก ' + u.withdraw);
+        if (u.receive > 0) breakdown.push('รับเข้า ' + u.receive);
+        if (u.daily > 0) breakdown.push('ปิดร้าน ' + u.daily);
+        if (u.audit > 0) breakdown.push('ออดิท ' + u.audit);
+        infoHtml = '<div style="background:#FEF3C7;border-left:3px solid #F59E0B;padding:11px 13px;border-radius:10px;color:#78350F;">'
+          +'<b>ℹ️ จะปิดใช้งานเท่านั้น</b> (ไม่ลบประวัติ)<br>'
+          +'รายการนี้มีประวัติ <b>' + u.total + ' รายการ</b> (' + breakdown.join(', ') + ')<br>'
+          +'หลังลบ: จะหายจากเมนูเบิก/รับ แต่ข้อมูลเก่ายังคงอยู่ใน Sheet · <b>เปิดใช้งานคืนได้</b>'
+          +'</div>';
+        $('delConfirm').textContent = '🚫 ปิดใช้งาน';
+      }
+      $('delUsageInfo').innerHTML = infoHtml;
+
+      // Cooldown 2 วินาทีกัน misclick
+      let secLeft = 2;
+      $('delConfirm').textContent = (res.canHardDelete ? '🗑 ลบถาวร' : '🚫 ปิดใช้งาน') + ' (' + secLeft + ')';
+      clearInterval(delCooldownTimer);
+      delCooldownTimer = setInterval(function(){
+        secLeft--;
+        if (secLeft > 0) {
+          $('delConfirm').textContent = (res.canHardDelete ? '🗑 ลบถาวร' : '🚫 ปิดใช้งาน') + ' (' + secLeft + ')';
+        } else {
+          clearInterval(delCooldownTimer);
+          $('delConfirm').textContent = res.canHardDelete ? '🗑 ลบถาวร' : '🚫 ปิดใช้งาน';
+          updateDelButtonState();
+        }
+      }, 1000);
+    })
+    .catch(function(err){
+      $('delLoading').innerHTML = '<div style="color:var(--red);">โหลดไม่ได้: '+escHtml(err.message)+'</div>';
+    });
 }
-function closeDeleteModal(){ $('delModal').classList.remove('show'); }
+
+function updateDelButtonState(){
+  // ถ้า hard delete → ต้องพิมพ์ชื่อให้ตรง
+  if (pendingDelete.canHardDelete) {
+    const typed = $('delConfirmName').value.trim();
+    $('delConfirm').disabled = typed !== pendingDelete.name;
+  } else {
+    $('delConfirm').disabled = false;
+  }
+}
+
+$('delConfirmName').addEventListener('input', updateDelButtonState);
+
+function closeDeleteModal(){
+  $('delModal').classList.remove('show');
+  clearInterval(delCooldownTimer);
+}
 
 $('delClose').addEventListener('click', closeDeleteModal);
 $('delCancel').addEventListener('click', closeDeleteModal);
@@ -314,16 +406,17 @@ $('delModal').addEventListener('click', function(e){ if(e.target===$('delModal')
 
 $('delConfirm').addEventListener('click', function(){
   const btn = $('delConfirm');
+  const isHard = pendingDelete.canHardDelete;
   btn.disabled = true; btn.textContent = 'กำลังลบ...';
-  api('deleteStockItem', { id: pendingDelete.id, hard: true })
+  api('deleteStockItem', { id: pendingDelete.id, hard: isHard })
     .then(function(res){
-      btn.disabled = false; btn.textContent = 'ปิดใช้งาน / ลบ';
       closeDeleteModal();
       toast(res.msg);
       loadStockManage();
     })
     .catch(function(err){
-      btn.disabled = false; btn.textContent = 'ปิดใช้งาน / ลบ';
+      btn.disabled = false;
+      btn.textContent = isHard ? '🗑 ลบถาวร' : '🚫 ปิดใช้งาน';
       toast('ผิดพลาด: '+err.message);
     });
 });
