@@ -145,15 +145,14 @@ document.querySelectorAll('.tc').forEach(function(b){
   });
 });
 
-async function loadActivities(){
+function loadActivities(){
   $('content').innerHTML = '<div class="loading">กำลังโหลด...</div>';
-  try{
-    const r = await api('getActivityFeed', { start: $('dStart').value, end: $('dEnd').value });
+  apiSWR('getActivityFeed', { start: $('dStart').value, end: $('dEnd').value }, function(r){
     allActivities = r.activities || [];
     render();
-  }catch(err){
+  }).catch(function(err){
     $('content').innerHTML = '<div class="empty"><div class="em">⚠️</div><div class="t">โหลดไม่ได้</div></div>';
-  }
+  });
 }
 
 function matchType(act, filterType){
