@@ -193,26 +193,26 @@ document.querySelectorAll('.tchip').forEach(function(b){
 
 $('staffFilter').addEventListener('change', function(){ filter.staffId = this.value; render(); });
 
-async function loadStaff(){
-  try{
-    const r = await api('getAttendStaff', { includeInactive: true });
+function loadStaff(){
+  apiSWR('getAttendStaff', { includeInactive: true }, function(r){
     allStaff = r.staff || [];
     const sel = $('staffFilter');
+    const cur = sel.value;
     sel.innerHTML = '<option value="">ทุกคน</option>' + allStaff.map(function(s){
       return '<option value="'+s.id+'">'+escHtml(s.name + (s.nickname?' ('+s.nickname+')':''))+'</option>';
     }).join('');
-  }catch(err){ /* silent */ }
+    sel.value = cur;
+  }).catch(function(){ /* silent */ });
 }
 
-async function loadReport(){
+function loadReport(){
   $('reportList').innerHTML = '<div class="loading">กำลังโหลด...</div>';
-  try{
-    const r = await api('getAttendReport', { start: $('dStart').value, end: $('dEnd').value });
+  apiSWR('getAttendReport', { start: $('dStart').value, end: $('dEnd').value }, function(r){
     allLogs = r.logs || [];
     render();
-  }catch(err){
+  }).catch(function(err){
     $('reportList').innerHTML = '<div class="empty"><div class="em">⚠️</div><div class="t">โหลดไม่ได้</div><div class="s">'+escHtml(err.message)+'</div></div>';
-  }
+  });
 }
 
 function render(){
