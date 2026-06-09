@@ -141,8 +141,7 @@ const au = {
 function load(){
   const box = document.getElementById('auList');
   box.innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div>';
-  api('getStockBalances', {})
-    .then(function(res){
+  apiSWR('getStockBalances', {}, function(res){
       au.balances = (res.items||[]).filter(function(x){return x.active!==false;});
       render();
     })
