@@ -186,8 +186,8 @@ function render(){
     }
     const cls = it.mode==='count' ? 'count-mode' : '';
     const modePill = it.mode==='count'
-      ? '<span class="mp count">ชั่ง</span>'
-      : '<span class="mp withdraw">เบิก</span>';
+      ? '<span class="mp count">โหมด: ชั่งกรัม</span>'
+      : '<span class="mp withdraw">โหมด: นับชิ้น</span>';
     return '<div class="close-row '+cls+'" data-id="'+it.id+'">'
       +'<div>'
         +'<div class="nm">'+escHtml(it.name)+'<span class="u">('+escHtml(it.unit)+')</span>'+modePill+'</div>'
