@@ -196,7 +196,7 @@ function render(){
     const st = calcStatus(it);
     const cls = st ? ('has-input '+st.status) : '';
     const diffLabel = st ? (Math.abs(st.diff)<0.01 ? '✓ ตรง' : (st.diff>0?'+':'')+st.diff) : '';
-    const modeP = it.mode==='count' ? '<span class="mp count">ชั่ง</span>' : '<span class="mp">เบิก</span>';
+    const modeP = it.mode==='count' ? '<span class="mp count">โหมด: ชั่งกรัม</span>' : '<span class="mp">โหมด: นับชิ้น</span>';
     const reason = au.reasons[it.id] || '';
     const adjust = !!au.adjusts[it.id];
     return '<div class="audit-row '+cls+'" data-id="'+it.id+'">'
