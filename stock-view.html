@@ -114,7 +114,7 @@ function renderStockList(){
   }
   box.innerHTML = filtered.map(function(it){
     const cls = it.balance <= 0 ? 'out' : (it.lowStock ? 'low' : '');
-    const modePill = it.mode === 'count' ? '<span class="pill mode-count">ชั่ง/นับ</span>' : '<span class="pill">เบิก</span>';
+    const modePill = it.mode === 'count' ? '<span class="pill mode-count">โหมด: ชั่งกรัม</span>' : '<span class="pill">โหมด: นับชิ้น</span>';
     const meta = '<span>'+escHtml(it.category)+'</span>'+modePill
       +(it.minStock>0 ? '<span>ขั้นต่ำ '+it.minStock+' '+escHtml(it.unit)+'</span>' : '');
     const todayInfo = (it.todayWithdraw>0 || it.todayReceive>0)
