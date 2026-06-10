@@ -116,7 +116,7 @@ function render(){
   box.innerHTML = filtered.map(function(it){
     const v = rc.qty[it.id] || '';
     const has = v && parseFloat(v) > 0;
-    const modeP = it.mode==='count' ? '<span class="mp">ชั่ง/นับ</span>' : '';
+    const modeP = it.mode==='count' ? '<span class="mp">โหมด: ชั่งกรัม</span>' : '<span class="mp" style="background:#EEF1F5;color:#5A5247;">โหมด: นับชิ้น</span>';
     return '<div class="op-row '+(has?'has':'')+'" data-id="'+it.id+'">'
       +'<div class="nm">'+escHtml(it.name)+'<span class="u">('+escHtml(it.unit)+')</span>'+modeP+'</div>'
       +'<div class="iv">'
