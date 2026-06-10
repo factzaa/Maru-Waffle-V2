@@ -80,6 +80,10 @@
         <button class="add-btn" id="btnAddItem"><span>➕</span> เพิ่มรายการใหม่</button>
       </div>
 
+      <div style="margin-bottom:12px;">
+        <button id="btnSuggestMin" style="width:100%;padding:11px;border:1.5px dashed #7C3AED;background:#F5F3FF;color:#7C3AED;border-radius:12px;font-family:'Kanit';font-weight:700;font-size:13px;cursor:pointer;line-height:1.35;">💡 แนะนำสต๊อกขั้นต่ำให้ทุกรายการ<br><span style="font-weight:500;font-size:11px;opacity:.8;">(เฉลี่ยใช้ 7 วัน × สำรอง 5 วัน · แก้ได้ก่อนบันทึก)</span></button>
+      </div>
+
       <div class="stock-filters" id="mgrCatChips" style="background:transparent;padding:0;">
         <button class="stock-cat-chip on" data-cat="all">ทั้งหมด</button>
         <button class="stock-cat-chip" data-cat="Waffle">🧁 Waffle</button>
@@ -93,6 +97,13 @@
 
       <div id="mgrList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
+
+<div id="saveAllBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:50;background:#1A1A1A;padding:12px 16px;box-shadow:0 -4px 16px rgba(0,0,0,.22);">
+  <div style="max-width:520px;margin:0 auto;display:flex;gap:10px;align-items:center;">
+    <div style="flex:1;color:#fff;font-family:'Kanit';font-size:12px;line-height:1.35;" id="saveAllInfo">เติมค่าแนะนำแล้ว — ตรวจ/แก้ได้ก่อนบันทึก</div>
+    <button id="btnSaveAllMin" style="background:#FFC629;color:#1A1A1A;border:0;padding:11px 16px;border-radius:10px;font-family:'Kanit';font-weight:800;font-size:13.5px;cursor:pointer;white-space:nowrap;">💾 บันทึกทั้งหมด</button>
+  </div>
+</div>
     <div class="foot">🐤 บันทึกการตั้งค่าทีละรายการ</div>
   </div>
 </div>
@@ -196,7 +207,7 @@ function renderMgrList(){
       +'<div class="top"><div class="nm">'+escHtml(it.name)+'</div><div class="id">'+it.id+'</div></div>'
       +'<div class="fields">'
         +'<div><label>หน่วย</label><input type="text" data-f="unit" value="'+escHtml(it.unit)+'"></div>'
-        +'<div><label>โหมด</label><select data-f="mode"><option value="withdraw"'+(it.mode==='withdraw'?' selected':'')+'>คีย์เบิก (ของชิ้น)</option><option value="count"'+(it.mode==='count'?' selected':'')+'>นับสิ้นวัน (กรัม/ml)</option></select></div>'
+        +'<div><label>โหมด</label><select data-f="mode"><option value="withdraw"'+(it.mode==='withdraw'?' selected':'')+'>นับชิ้น (ของชิ้น/ถุง)</option><option value="count"'+(it.mode==='count'?' selected':'')+'>ชั่งกรัม (กรัม/ml)</option></select></div>'
         +'<div><label>สต๊อกขั้นต่ำ (เตือนใกล้หมด)</label><input type="number" min="0" step="any" data-f="minStock" value="'+it.minStock+'"></div>'
         +'<div><label>สถานะ</label><select data-f="active"><option value="true"'+(it.active!==false?' selected':'')+'>ใช้งาน</option><option value="false"'+(it.active===false?' selected':'')+'>หยุดใช้</option></select></div>'
       +'</div>'
@@ -419,6 +430,53 @@ $('delConfirm').addEventListener('click', function(){
       btn.textContent = isHard ? '🗑 ลบถาวร' : '🚫 ปิดใช้งาน';
       toast('ผิดพลาด: '+err.message);
     });
+});
+
+$('btnSuggestMin').addEventListener('click', function(){
+  const btn = this, old = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '⏳ กำลังวิเคราะห์การใช้...';
+  api('suggestMinStock', { lookbackDays: 7, bufferDays: 5 })
+    .then(function(res){
+      btn.disabled = false; btn.innerHTML = old;
+      const sug = res.suggestions || {};
+      // เปิดดูทุกรายการ (ล้างฟิลเตอร์) แล้วเติมค่าแนะนำ
+      mgrData.filter = { cat: 'all', q: '' };
+      document.querySelectorAll('#mgrCatChips .stock-cat-chip').forEach(function(x){ x.classList.toggle('on', x.dataset.cat === 'all'); });
+      $('mgrSearch').value = '';
+      let changed = 0, total = 0;
+      mgrData.items.forEach(function(it){
+        if(sug.hasOwnProperty(it.id)){
+          total++;
+          if(Number(it.minStock) !== Number(sug[it.id])) changed++;
+          it.minStock = sug[it.id];
+        }
+      });
+      renderMgrList();
+      $('saveAllInfo').textContent = 'เติมค่าแนะนำ ' + total + ' รายการ (เปลี่ยน ' + changed + ') — ตรวจ/แก้ได้ก่อนกดบันทึก';
+      $('saveAllBar').style.display = 'block';
+      toast('เติมค่าแนะนำแล้ว ✓ ตรวจแล้วกด "บันทึกทั้งหมด"');
+    })
+    .catch(function(err){ btn.disabled = false; btn.innerHTML = old; toast('ผิดพลาด: ' + err.message); });
+});
+
+$('btnSaveAllMin').addEventListener('click', function(){
+  // ดึงค่าจากช่องที่เห็น (ฟิลเตอร์=ทั้งหมด → เห็นทุกการ์ด) กลับเข้า mgrData
+  document.querySelectorAll('.mg-row').forEach(function(row){
+    const el = row.querySelector('[data-f="minStock"]'); if(!el) return;
+    const idx = mgrData.items.findIndex(function(x){ return x.id === row.dataset.id; });
+    if(idx >= 0) mgrData.items[idx].minStock = parseFloat(el.value) || 0;
+  });
+  const items = mgrData.items.map(function(it){ return { id: it.id, minStock: Number(it.minStock) || 0 }; });
+  const btn = this, old = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳ บันทึก...';
+  api('saveMinStockBatch', { items: items })
+    .then(function(res){
+      btn.disabled = false; btn.textContent = old;
+      $('saveAllBar').style.display = 'none';
+      toast(res.msg || 'บันทึกแล้ว ✓');
+      loadStockManage();
+    })
+    .catch(function(err){ btn.disabled = false; btn.textContent = old; toast('ผิดพลาด: ' + err.message); });
 });
 
 renderIcons();
