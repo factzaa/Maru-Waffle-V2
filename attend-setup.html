@@ -236,11 +236,28 @@ document.getElementById('addStaffBtn').addEventListener('click', function(){ ope
 // ===== เอกสาร (Drive) =====
 const pickedDocs = { idCard:null, doc1:null, doc2:null };
 function readFileB64(file){
-  return new Promise(function(resolve,reject){
-    const r = new FileReader();
-    r.onload = function(){ resolve({ base64: String(r.result).split(',')[1], mime: file.type || 'image/jpeg' }); };
-    r.onerror = reject;
-    r.readAsDataURL(file);
+  // ย่อรูปก่อนส่ง (กัน payload ใหญ่เกินจนอัปไม่ขึ้น) — กว้าง/สูงสุด 1600px, jpeg 0.8
+  return new Promise(function(resolve, reject){
+    const fr = new FileReader();
+    fr.onload = function(){
+      const img = new Image();
+      img.onload = function(){
+        let w = img.width, h = img.height;
+        const maxDim = 1600;
+        if(w > maxDim || h > maxDim){
+          const sc = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * sc); h = Math.round(h * sc);
+        }
+        const c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = c.toDataURL('image/jpeg', 0.8);
+        resolve({ base64: dataUrl.split(',')[1], mime: 'image/jpeg' });
+      };
+      img.onerror = function(){ reject(new Error('โหลดรูปไม่ได้')); };
+      img.src = fr.result;
+    };
+    fr.onerror = function(){ reject(new Error('อ่านไฟล์ไม่ได้')); };
+    fr.readAsDataURL(file);
   });
 }
 ['idCard','doc1','doc2'].forEach(function(slot){
