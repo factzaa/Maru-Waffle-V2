@@ -63,6 +63,11 @@
 .gps-btn{background:#E0F7FA;color:#1B98A4;border:1.5px solid #B2EBF2;padding:9px 14px;border-radius:9px;
   font-family:'Kanit';font-weight:600;font-size:12.5px;cursor:pointer;margin-bottom:10px;}
 .gps-btn:hover{background:#B2EBF2;}
+.doc-slot{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line);}
+.doc-slot .dl{flex:1;font-size:13px;color:var(--ink);}
+.doc-slot .da{display:none;font-size:12px;color:#2563EB;text-decoration:underline;}
+.doc-slot .dp{display:none;font-size:12px;color:#15803D;font-weight:600;}
+.doc-slot .db{font-size:12px;color:#7C3AED;cursor:pointer;border:1px solid #C4B5FD;border-radius:8px;padding:4px 11px;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -120,6 +125,27 @@
         <div><label>PIN 4 หลัก *</label><input type="text" id="sfPin" inputmode="numeric" maxlength="4" placeholder="1234"></div>
         <div><label>สถานะ</label><select id="sfActive"><option value="true">ใช้งาน</option><option value="false">หยุดใช้</option></select></div>
       </div>
+      <div class="row">
+        <div><label>ประเภท</label><select id="sfType"><option value="ประจำ">ประจำ</option><option value="พาร์ทไทม์">พาร์ทไทม์</option></select></div>
+        <div><label>วันเริ่มงาน</label><input type="date" id="sfStart"></div>
+      </div>
+      <div class="row">
+        <div><label>ธนาคาร</label><input type="text" id="sfBank" placeholder="เช่น กสิกรไทย"></div>
+        <div><label>เลขบัญชี</label><input type="text" id="sfAccNo" inputmode="numeric" placeholder="xxx-x-xxxxx-x"></div>
+      </div>
+      <label>ชื่อบัญชี</label>
+      <input type="text" id="sfAccName" placeholder="ชื่อเจ้าของบัญชี">
+      <div class="row">
+        <div><label>เบอร์โทร</label><input type="tel" id="sfPhone" inputmode="tel" placeholder="08x-xxx-xxxx"></div>
+        <div><label>LINE ID</label><input type="text" id="sfLineId" placeholder="line id / @ ไอดี"></div>
+      </div>
+    </div>
+
+    <div class="form-card" style="margin-top:10px;">
+      <label style="font-weight:700;display:block;margin-bottom:2px;">📎 เอกสาร <span style="font-weight:400;color:var(--ink-2);font-size:11px;">เก็บใน Google Drive ส่วนตัว · เปิดได้เฉพาะคุณ</span></label>
+      <div class="doc-slot" data-slot="idCard"><span class="dl">สำเนาบัตรประชาชน</span><a class="da" id="lnkidCard" target="_blank">เปิดดู</a><span class="dp" id="pickidCard">✓ รูปใหม่</span><label class="db">เลือกรูป<input type="file" accept="image/*" id="fileidCard" hidden></label></div>
+      <div class="doc-slot" data-slot="doc1"><span class="dl">เอกสารอื่น 1</span><a class="da" id="lnkdoc1" target="_blank">เปิดดู</a><span class="dp" id="pickdoc1">✓ รูปใหม่</span><label class="db">เลือกรูป<input type="file" accept="image/*" id="filedoc1" hidden></label></div>
+      <div class="doc-slot" data-slot="doc2"><span class="dl">เอกสารอื่น 2</span><a class="da" id="lnkdoc2" target="_blank">เปิดดู</a><span class="dp" id="pickdoc2">✓ รูปใหม่</span><label class="db">เลือกรูป<input type="file" accept="image/*" id="filedoc2" hidden></label></div>
     </div>
     <div class="actions">
       <button class="cancel" id="sfCancel">ยกเลิก</button>
@@ -195,7 +221,7 @@ function renderStaff(){
       +'<div class="av">'+escHtml(initial)+'</div>'
       +'<div class="info">'
         +'<div class="nm">'+escHtml(s.name)+(s.nickname?' ('+escHtml(s.nickname)+')':'')+'</div>'
-        +'<div class="meta">'+(s.position?escHtml(s.position):'-')+' · <span class="id">'+s.id+'</span>'+(s.active===false?' · <b style="color:var(--red);">หยุดใช้</b>':'')+'</div>'
+        +'<div class="meta">'+(s.position?escHtml(s.position):'-')+' · <span class="id">'+s.id+'</span>'+(s.type?' · <span style="font-weight:600;color:'+(s.type==='พาร์ทไทม์'?'#B45309':'#2563EB')+';">'+escHtml(s.type)+'</span>':'')+(s.active===false?' · <b style="color:var(--red);">หยุดใช้</b>':'')+'</div>'
       +'</div>'
       +'<div class="actions"><button data-edit="'+s.id+'">แก้ไข</button></div>'
     +'</div>';
@@ -207,9 +233,42 @@ function renderStaff(){
 
 document.getElementById('addStaffBtn').addEventListener('click', function(){ openStaffModal(null); });
 
-function openStaffModal(id){
+// ===== เอกสาร (Drive) =====
+const pickedDocs = { idCard:null, doc1:null, doc2:null };
+function readFileB64(file){
+  return new Promise(function(resolve,reject){
+    const r = new FileReader();
+    r.onload = function(){ resolve({ base64: String(r.result).split(',')[1], mime: file.type || 'image/jpeg' }); };
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+['idCard','doc1','doc2'].forEach(function(slot){
+  document.getElementById('file'+slot).addEventListener('change', async function(e){
+    const f = e.target.files[0]; if(!f) return;
+    try{ pickedDocs[slot] = await readFileB64(f); document.getElementById('pick'+slot).style.display='inline'; }
+    catch(err){ toast('อ่านไฟล์ไม่ได้'); }
+  });
+});
+function resetDocUI(){
+  pickedDocs.idCard = pickedDocs.doc1 = pickedDocs.doc2 = null;
+  ['idCard','doc1','doc2'].forEach(function(slot){
+    document.getElementById('pick'+slot).style.display='none';
+    const a = document.getElementById('lnk'+slot); a.style.display='none'; a.href='#';
+    document.getElementById('file'+slot).value='';
+  });
+}
+function setDocLink(slot, url){
+  const a = document.getElementById('lnk'+slot);
+  if(url){ a.href=url; a.style.display='inline'; } else { a.style.display='none'; }
+}
+
+async function openStaffModal(id){
   const isEdit = !!id;
   document.getElementById('staffModalTitle').textContent = isEdit ? 'แก้ไขพนักงาน' : 'เพิ่มพนักงาน';
+  resetDocUI();
+  document.getElementById('sfType').value = 'ประจำ';
+  ['sfStart','sfBank','sfAccNo','sfAccName','sfPhone','sfLineId'].forEach(function(k){ document.getElementById(k).value=''; });
   if(isEdit){
     const s = staffList.find(function(x){return x.id===id;});
     document.getElementById('sfId').value = s.id;
@@ -219,6 +278,22 @@ function openStaffModal(id){
     document.getElementById('sfPin').value = '';
     document.getElementById('sfPin').placeholder = 'เว้นว่างถ้าไม่เปลี่ยน';
     document.getElementById('sfActive').value = s.active !== false ? 'true' : 'false';
+    document.getElementById('sfType').value = s.type || 'ประจำ';
+    document.getElementById('sfStart').value = s.startDate || '';
+    document.getElementById('staffModal').classList.add('show');
+    // โหลดข้อมูลอ่อนไหว (บัญชี/เอกสาร) เฉพาะตอนเปิดแก้ — ไม่ cache
+    try{
+      const d = (await api('getStaffDetail', { staffId: id })).detail;
+      if(d){
+        document.getElementById('sfBank').value = d.bank || '';
+        document.getElementById('sfAccNo').value = d.accountNo || '';
+        document.getElementById('sfAccName').value = d.accountName || '';
+        document.getElementById('sfPhone').value = d.phone || '';
+        document.getElementById('sfLineId').value = d.lineId || '';
+        if(!document.getElementById('sfStart').value) document.getElementById('sfStart').value = d.startDate || '';
+        setDocLink('idCard', d.idCard); setDocLink('doc1', d.doc1); setDocLink('doc2', d.doc2);
+      }
+    }catch(err){ /* เงียบ ถ้าโหลดรายละเอียดไม่ได้ */ }
   } else {
     document.getElementById('sfId').value = '';
     document.getElementById('sfName').value = '';
@@ -227,8 +302,8 @@ function openStaffModal(id){
     document.getElementById('sfPin').value = '';
     document.getElementById('sfPin').placeholder = '1234';
     document.getElementById('sfActive').value = 'true';
+    document.getElementById('staffModal').classList.add('show');
   }
-  document.getElementById('staffModal').classList.add('show');
 }
 document.getElementById('sfCancel').addEventListener('click', function(){
   document.getElementById('staffModal').classList.remove('show');
@@ -244,10 +319,20 @@ document.getElementById('sfSave').addEventListener('click', async function(){
     name: name,
     nickname: document.getElementById('sfNick').value.trim(),
     position: document.getElementById('sfPos').value.trim(),
-    active: document.getElementById('sfActive').value === 'true'
+    active: document.getElementById('sfActive').value === 'true',
+    type: document.getElementById('sfType').value,
+    startDate: document.getElementById('sfStart').value,
+    bank: document.getElementById('sfBank').value.trim(),
+    accountNo: document.getElementById('sfAccNo').value.trim(),
+    accountName: document.getElementById('sfAccName').value.trim(),
+    phone: document.getElementById('sfPhone').value.trim(),
+    lineId: document.getElementById('sfLineId').value.trim()
   };
   if(id) data.id = id;
   if(pin) data.pin = pin;
+  if(pickedDocs.idCard) data.idCardPhoto = pickedDocs.idCard;
+  if(pickedDocs.doc1) data.doc1Photo = pickedDocs.doc1;
+  if(pickedDocs.doc2) data.doc2Photo = pickedDocs.doc2;
   const btn = this; btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
   try{
     const r = await api('saveAttendStaff', { data: data });
