@@ -129,6 +129,8 @@
         <div><label>ประเภท</label><select id="sfType"><option value="ประจำ">ประจำ</option><option value="พาร์ทไทม์">พาร์ทไทม์</option></select></div>
         <div><label>วันเริ่มงาน</label><input type="date" id="sfStart"></div>
       </div>
+      <label>เริ่มนับค่าจ้าง <span style="font-size:11px;color:var(--ink-2);font-weight:400;">— เฉพาะพาร์ทไทม์ (วันแรกที่เริ่มนับวันทำงาน)</span></label>
+      <input type="date" id="sfCountFrom">
       <div class="row">
         <div><label>ธนาคาร</label><input type="text" id="sfBank" placeholder="เช่น กสิกรไทย"></div>
         <div><label>เลขบัญชี</label><input type="text" id="sfAccNo" inputmode="numeric" placeholder="xxx-x-xxxxx-x"></div>
@@ -285,7 +287,7 @@ async function openStaffModal(id){
   document.getElementById('staffModalTitle').textContent = isEdit ? 'แก้ไขพนักงาน' : 'เพิ่มพนักงาน';
   resetDocUI();
   document.getElementById('sfType').value = 'ประจำ';
-  ['sfStart','sfBank','sfAccNo','sfAccName','sfPhone','sfLineId'].forEach(function(k){ document.getElementById(k).value=''; });
+  ['sfStart','sfBank','sfAccNo','sfAccName','sfPhone','sfLineId','sfCountFrom'].forEach(function(k){ document.getElementById(k).value=''; });
   if(isEdit){
     const s = staffList.find(function(x){return x.id===id;});
     document.getElementById('sfId').value = s.id;
@@ -307,6 +309,7 @@ async function openStaffModal(id){
         document.getElementById('sfAccName').value = d.accountName || '';
         document.getElementById('sfPhone').value = d.phone || '';
         document.getElementById('sfLineId').value = d.lineId || '';
+        document.getElementById('sfCountFrom').value = d.countFrom || '';
         if(!document.getElementById('sfStart').value) document.getElementById('sfStart').value = d.startDate || '';
         setDocLink('idCard', d.idCard); setDocLink('doc1', d.doc1); setDocLink('doc2', d.doc2);
       }
@@ -343,7 +346,8 @@ document.getElementById('sfSave').addEventListener('click', async function(){
     accountNo: document.getElementById('sfAccNo').value.trim(),
     accountName: document.getElementById('sfAccName').value.trim(),
     phone: document.getElementById('sfPhone').value.trim(),
-    lineId: document.getElementById('sfLineId').value.trim()
+    lineId: document.getElementById('sfLineId').value.trim(),
+    countFrom: document.getElementById('sfCountFrom').value
   };
   if(id) data.id = id;
   if(pin) data.pin = pin;
