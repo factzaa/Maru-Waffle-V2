@@ -32,6 +32,17 @@
 .staff-item .actions button{border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:5px 10px;
   border-radius:8px;font-family:'Kanit';font-weight:600;font-size:12px;cursor:pointer;}
 .staff-item .actions button:hover{background:#FFF7E0;}
+.staff-item .actions .vbtn{border-color:#C7B8FF;color:#6D28D9;background:#F6F2FF;}
+.sv-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--line);}
+.sv-row:first-child{border-top:0;}
+.sv-row .k{color:var(--ink-2);font-size:13px;flex-shrink:0;}
+.sv-row .v{font-weight:600;font-size:13.5px;text-align:right;word-break:break-word;}
+.sv-row .vwrap{display:flex;align-items:center;gap:8px;justify-content:flex-end;flex:1;}
+.copybtn{border:1.5px solid #FFC629;background:#FFF7E0;color:#1A1A1A;font-family:'Kanit';font-weight:700;
+  font-size:11.5px;padding:4px 11px;border-radius:9px;cursor:pointer;white-space:nowrap;}
+.copybtn:active{background:#FFC629;}
+.sv-sec{font-family:'Kanit';font-weight:700;font-size:12px;color:var(--ink-2);margin:12px 0 2px;}
+.sv-doc{color:#2563EB;font-size:13px;text-decoration:underline;}
 
 .form-card{background:#FFF7E0;border-radius:12px;padding:14px;margin-bottom:14px;}
 .form-card label{font-size:11.5px;color:var(--ink-2);font-weight:600;display:block;margin-bottom:5px;}
@@ -156,6 +167,15 @@
   </div>
 </div>
 
+<!-- Modal ดูข้อมูลพนักงาน (อ่านอย่างเดียว) -->
+<div class="modal-bg" id="staffViewModal">
+  <div class="panel">
+    <h3 id="svTitle">ข้อมูลพนักงาน</h3>
+    <div id="svBody" class="form-card"><div style="text-align:center;color:var(--ink-2);padding:18px;font-size:13px;">กำลังโหลด...</div></div>
+    <div class="actions"><button class="cancel" id="svClose">ปิด</button><button class="save" id="svEdit">แก้ไข</button></div>
+  </div>
+</div>
+
 <!-- Modal แก้สาขา -->
 <div class="modal-bg" id="branchModal">
   <div class="panel">
@@ -225,9 +245,12 @@ function renderStaff(){
         +'<div class="nm">'+escHtml(s.name)+(s.nickname?' ('+escHtml(s.nickname)+')':'')+'</div>'
         +'<div class="meta">'+(s.position?escHtml(s.position):'-')+' · <span class="id">'+s.id+'</span>'+(s.type?' · <span style="font-weight:600;color:'+(s.type==='พาร์ทไทม์'?'#B45309':'#2563EB')+';">'+escHtml(s.type)+'</span>':'')+(s.active===false?' · <b style="color:var(--red);">หยุดใช้</b>':'')+'</div>'
       +'</div>'
-      +'<div class="actions"><button data-edit="'+s.id+'">แก้ไข</button></div>'
+      +'<div class="actions"><button class="vbtn" data-view="'+s.id+'">ดูข้อมูล</button><button data-edit="'+s.id+'">แก้ไข</button></div>'
     +'</div>';
   }).join('');
+  box.querySelectorAll('[data-view]').forEach(function(btn){
+    btn.addEventListener('click', function(){ openStaffView(btn.dataset.view); });
+  });
   box.querySelectorAll('[data-edit]').forEach(function(btn){
     btn.addEventListener('click', function(){ openStaffModal(btn.dataset.edit); });
   });
@@ -325,6 +348,76 @@ async function openStaffModal(id){
     document.getElementById('staffModal').classList.add('show');
   }
 }
+// ===== ดูข้อมูลพนักงาน (อ่านอย่างเดียว) =====
+let svCurrentId = null;
+function copyText(txt, label){
+  function ok(){ toast((label||'คัดลอก')+' แล้ว ✓'); }
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(txt).then(ok).catch(function(){ fallbackCopy(txt, ok); });
+  } else fallbackCopy(txt, ok);
+}
+function fallbackCopy(txt, ok){
+  const ta=document.createElement('textarea'); ta.value=txt;
+  ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); ok(); }catch(e){ toast('คัดลอกไม่ได้'); }
+  document.body.removeChild(ta);
+}
+function svRow(k, v){ if(!v) return ''; return '<div class="sv-row"><span class="k">'+k+'</span><span class="v">'+escHtml(v)+'</span></div>'; }
+function svCopyRow(k, v){
+  if(!v) return '';
+  return '<div class="sv-row"><span class="k">'+k+'</span><span class="vwrap"><b style="font-size:14.5px;">'+escHtml(v)+'</b>'
+    +'<button class="copybtn" data-copy="'+escHtml(v)+'" data-label="'+escHtml(k)+'">คัดลอก</button></span></div>';
+}
+function svDoc(k, url){ if(!url) return ''; return '<div class="sv-row"><span class="k">'+k+'</span><a class="sv-doc" href="'+escHtml(url)+'" target="_blank" rel="noopener">เปิดดู ↗</a></div>'; }
+
+async function openStaffView(id){
+  svCurrentId = id;
+  const s = staffList.find(function(x){return x.id===id;}) || {};
+  document.getElementById('svTitle').textContent = (s.nickname? s.nickname : s.name) || 'ข้อมูลพนักงาน';
+  document.getElementById('svBody').innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:18px;font-size:13px;">กำลังโหลด...</div>';
+  document.getElementById('staffViewModal').classList.add('show');
+  let d = {};
+  try{ d = (await api('getStaffDetail', { staffId: id })).detail || {}; }catch(err){}
+  const startD = (d.startDate||s.startDate) ? fmtDM(d.startDate||s.startDate) : '';
+  let html = '';
+  html += svRow('รหัส', s.id);
+  html += svRow('ชื่อ-นามสกุล', s.name || d.name);
+  html += svRow('ชื่อเล่น', s.nickname || d.nickname);
+  html += svRow('ตำแหน่ง', s.position || d.position);
+  html += svRow('ประเภท', s.type || d.type);
+  html += svRow('วันเริ่มงาน', startD);
+  html += '<div class="sv-sec">📞 ติดต่อ</div>';
+  html += svCopyRow('เบอร์โทร', d.phone);
+  html += svRow('LINE ID', d.lineId);
+  html += '<div class="sv-sec">🏦 บัญชีรับเงิน</div>';
+  html += svRow('ธนาคาร', d.bank);
+  html += svCopyRow('เลขบัญชี', d.accountNo);
+  html += svRow('ชื่อบัญชี', d.accountName);
+  const hasDoc = d.idCard || d.doc1 || d.doc2;
+  if(hasDoc){
+    html += '<div class="sv-sec">📎 เอกสาร</div>';
+    html += svDoc('สำเนาบัตรประชาชน', d.idCard);
+    html += svDoc('เอกสารอื่น 1', d.doc1);
+    html += svDoc('เอกสารอื่น 2', d.doc2);
+  }
+  if(!d.phone && !d.bank && !d.accountNo && !hasDoc){
+    html += '<div class="sv-row"><span class="k" style="color:var(--ink-2);">ยังไม่มีข้อมูลบัญชี/เอกสาร — กดแก้ไขเพื่อเพิ่ม</span></div>';
+  }
+  document.getElementById('svBody').innerHTML = html;
+  document.getElementById('svBody').querySelectorAll('[data-copy]').forEach(function(b){
+    b.addEventListener('click', function(){ copyText(b.dataset.copy, b.dataset.label); });
+  });
+}
+function fmtDM(d){ const p=String(d||'').split('-'); return p.length===3?(p[2]+'/'+p[1]+'/'+p[0]):(d||''); }
+
+document.getElementById('svClose').addEventListener('click', function(){
+  document.getElementById('staffViewModal').classList.remove('show');
+});
+document.getElementById('svEdit').addEventListener('click', function(){
+  document.getElementById('staffViewModal').classList.remove('show');
+  if(svCurrentId) openStaffModal(svCurrentId);
+});
+
 document.getElementById('sfCancel').addEventListener('click', function(){
   document.getElementById('staffModal').classList.remove('show');
 });
