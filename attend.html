@@ -295,9 +295,38 @@ async function initCameraAndGps(){
     const v = $('camVideo'); v.srcObject = stream;
     v.onloadedmetadata = function(){ $('camLoading').style.display = 'none'; };
   }catch(err){
-    $('camLoading').innerHTML = '<div>❌ เปิดกล้องไม่ได้<br><br><small>'+escHtml(err.message)+'</small></div>';
+    showCameraError(err);
     return;
   }
+}
+
+function showCameraError(err){
+  const name = err.name || '';
+  const msg = err.message || String(err);
+  let title = '❌ เปิดกล้องไม่ได้';
+  let help = '';
+  if (name === 'NotAllowedError' || /denied|permission/i.test(msg)) {
+    title = '🚫 ไม่ได้รับอนุญาตให้ใช้กล้อง';
+    help = '<b>วิธีแก้:</b><br>'
+      + '1. กดไอคอน 🔒 ในแถบ URL (มุมบน)<br>'
+      + '2. กด <b>Permissions</b> → <b>Camera</b> → <b>Allow</b><br>'
+      + '3. กดปุ่ม "ลองใหม่" ด้านล่าง<br><br>'
+      + '<b>ถ้าติดตั้งเป็นแอปแล้ว:</b><br>'
+      + 'กดค้างที่ icon บนหน้าจอ → App info → Permissions → Camera → Allow';
+  } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+    title = '❌ ไม่พบกล้องหน้า';
+    help = 'ตรวจสอบว่ามือถือมีกล้องหน้า และไม่มีแอปอื่นกำลังใช้กล้องอยู่';
+  } else if (name === 'NotReadableError') {
+    title = '⚠️ กล้องถูกใช้งานอยู่';
+    help = 'มีแอปอื่นกำลังใช้กล้องอยู่ — ปิดแอป LINE/Camera/Snapchat/อื่นๆ แล้วลองใหม่';
+  } else {
+    help = msg;
+  }
+  $('camLoading').innerHTML = '<div style="padding:14px;text-align:center;">'
+    + '<div style="font-size:18px;font-weight:700;margin-bottom:10px;">'+title+'</div>'
+    + '<div style="font-size:12.5px;line-height:1.6;text-align:left;background:rgba(255,255,255,.08);padding:11px;border-radius:9px;margin-bottom:12px;">'+help+'</div>'
+    + '<button onclick="initCameraAndGps()" style="background:#FFC629;color:#1A1A1A;border:0;padding:9px 22px;border-radius:10px;font-family:Kanit;font-weight:700;font-size:14px;cursor:pointer;">🔄 ลองใหม่</button>'
+    + '</div>';
 }
 
 function requestGps(){
@@ -368,7 +397,13 @@ async function capture(type){
   btn.querySelector('span:last-child').textContent = 'กำลังถ่าย...';
 
   const v = $('camVideo'), c = $('camCanvas');
-  const w = v.videoWidth, h = v.videoHeight;
+  let w = v.videoWidth, h = v.videoHeight;
+  // ย่อให้ด้านยาวสุดไม่เกิน 1080px (ลดขนาดไฟล์ → อัปไวขึ้น เสถียรขึ้น)
+  const MAXD = 1080;
+  if (Math.max(w, h) > MAXD) {
+    const sc = MAXD / Math.max(w, h);
+    w = Math.round(w * sc); h = Math.round(h * sc);
+  }
   c.width = w; c.height = h;
   const ctx = c.getContext('2d');
 
@@ -385,7 +420,7 @@ async function capture(type){
   v.classList.add('hide'); c.classList.add('show');
 
   // export และส่ง
-  const dataUrl = c.toDataURL('image/jpeg', 0.85);
+  const dataUrl = c.toDataURL('image/jpeg', 0.82);
   const base64 = dataUrl.split(',')[1];
 
   try{
