@@ -258,10 +258,10 @@ function maruAssistantMarkup(currentPage){
   if(currentPage === 'assistant') return ''; // หน้าเต็มมีแชทอยู่แล้ว ไม่ต้องมีปุ่มลอยซ้ำ
   return ''
    + '<style id="maruStyle">'
-   + '.maru-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;'
-   + 'border:0;background:#FFC629;color:#1A1A1A;font-size:26px;box-shadow:0 6px 18px rgba(0,0,0,.22);cursor:pointer;z-index:900;'
+   + '.maru-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:50%;'
+   + 'border:0;background:transparent;color:#1A1A1A;font-size:30px;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;z-index:900;'
    + 'display:flex;align-items:center;justify-content:center;transition:transform .15s;overflow:hidden;padding:0;}'
-   + '.maru-fab img{width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;}'
+   + '.maru-fab img{width:124%;height:124%;object-fit:cover;border-radius:50%;display:block;}'
    + '.maru-fab:active{transform:scale(.92);}'
    + '.maru-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1600;display:none;align-items:flex-end;justify-content:center;}'
    + '.maru-ov.show{display:flex;}'
