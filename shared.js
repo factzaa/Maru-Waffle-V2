@@ -335,12 +335,29 @@ function maruThaiVoices(){
   var th = maruVoices.filter(function(v){ return /th/i.test(v.lang); });
   return th.length ? th : maruVoices;
 }
+function maruCleanForSpeech(text){
+  var t = String(text || '');
+  t = t.replace(/```[\s\S]*?```/g, ' ');      // โค้ดบล็อก
+  t = t.replace(/`([^`]*)`/g, '$1');           // โค้ดอินไลน์
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ');  // รูป
+  t = t.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1'); // ลิงก์ → เก็บข้อความ
+  t = t.replace(/^\s{0,3}#{1,6}\s*/gm, '');     // หัวข้อ #
+  t = t.replace(/^\s*[-*•·]\s+/gm, '');         // bullet ต้นบรรทัด
+  t = t.replace(/^\s*\d+\.\s+/gm, '');          // ลำดับเลข 1.
+  t = t.replace(/[*_~>#|]+/g, ' ');             // สัญลักษณ์ markdown
+  t = t.replace(/[-–—]{1,}/g, ' ');             // ขีด
+  t = t.replace(/[\/\\]+/g, ' ');               // สแลช
+  t = t.replace(/\s{2,}/g, ' ').trim();         // ช่องว่างซ้ำ
+  return t;
+}
 function maruPlay(text){
   try{
     if(!window.speechSynthesis) return;
     if(localStorage.getItem('maruMute') === '1') return;   // ปิดเสียงไว้
+    var clean = maruCleanForSpeech(text);
+    if(!clean) return;
     speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(text);
+    var u = new SpeechSynthesisUtterance(clean);
     u.lang = 'th-TH';
     u.rate = parseFloat(localStorage.getItem('maruRate') || '1') || 1;
     var want = localStorage.getItem('maruVoice') || '';
