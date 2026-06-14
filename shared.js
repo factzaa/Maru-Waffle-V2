@@ -163,6 +163,7 @@ function buildSidebar(currentPage){
     { page:'attendReport',   href:'attend-report.html',   icon:'trend',   label:'รายงานเข้า-ออกงาน' },
     { page:'attendSetup',    href:'attend-setup.html',    icon:'edit',    label:'จัดการพนักงาน/สาขา' },
     { page:'payments',       href:'payments.html',        icon:'receipt', label:'💰 การจ่ายเงิน' },
+    { page:'assistant',      href:'assistant.html',       icon:'sparkles', label:'🐤 ผู้ช่วยมารุ' },
     { group: '📖 คู่มือ' },
     { page:'manual',         href:'manual.html',          icon:'check',   label:'คู่มือการใช้งาน' },
   ];
