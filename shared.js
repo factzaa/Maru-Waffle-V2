@@ -244,6 +244,7 @@ function injectShell(currentPage){
     + '</div></div>'
     + '<input type="file" accept="image/*" capture="environment" id="rcptInputCam" style="display:none">'
     + '<input type="file" accept="image/*" id="rcptInputAlb" style="display:none">'
+    + maruAlertMarkup()
     + maruAssistantMarkup(currentPage)
     + '<div class="toast" id="toast"></div>';
   document.body.insertAdjacentHTML('afterbegin', html);
@@ -251,6 +252,7 @@ function injectShell(currentPage){
   bindSidebar();
   bindReceiptSheet();
   bindMaruAssistant(currentPage);
+  bindMaruAlerts(currentPage);
 }
 
 // ===== ผู้ช่วยมารุ: ปุ่มลอย + กล่องแชท + เสียง (Web Speech API ฟรี ไม่กินเครดิต) =====
@@ -316,6 +318,80 @@ function maruAssistantMarkup(currentPage){
    +     '<button class="maru-send" id="maruSend">➤</button>'
    +   '</div>'
    + '</div></div>';
+}
+
+// ===== กระดิ่งแจ้งเตือน (มารุเฝ้าร้าน — ในแอป) =====
+function maruAlertMarkup(){
+  return ''
+   + '<style id="maruAlStyle">'
+   + '.maru-bell{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:14px;width:46px;height:46px;border-radius:50%;border:0;background:#fff;box-shadow:0 3px 12px rgba(0,0,0,.18);cursor:pointer;z-index:940;display:flex;align-items:center;justify-content:center;padding:0;}'
+   + '.maru-bell svg{width:22px;height:22px;stroke:#1A1A1A;fill:none;}'
+   + '.maru-bell-badge{position:absolute;top:-3px;right:-3px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#DC2626;color:#fff;font-size:11px;font-weight:700;display:none;align-items:center;justify-content:center;font-family:"Sarabun";box-shadow:0 0 0 2px #fff;}'
+   + '.maru-al-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1500;display:none;justify-content:center;align-items:flex-start;}'
+   + '.maru-al-ov.show{display:flex;}'
+   + '.maru-al-panel{background:#FAF8F1;width:100%;max-width:480px;max-height:82vh;margin-top:calc(env(safe-area-inset-top) + 8px);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.3);}'
+   + '.maru-al-head{display:flex;align-items:center;gap:8px;padding:14px 16px;background:#FFC629;}'
+   + '.maru-al-head .t{flex:1;font-family:"Kanit";font-weight:800;font-size:16px;color:#1A1A1A;}'
+   + '.maru-al-head button{border:0;background:rgba(0,0,0,.08);width:32px;height:32px;border-radius:50%;font-size:15px;cursor:pointer;color:#1A1A1A;}'
+   + '.maru-al-list{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px;}'
+   + '.al-empty{text-align:center;color:#8A8170;font-size:14px;padding:30px 12px;font-family:"Sarabun";line-height:1.6;}'
+   + '.al-item{display:flex;gap:11px;background:#fff;border:1px solid #ECE6D6;border-left-width:4px;border-radius:12px;padding:11px 12px;}'
+   + '.al-item.crit{border-left-color:#DC2626;}.al-item.warn{border-left-color:#F59E0B;}.al-item.info{border-left-color:#2563EB;}'
+   + '.al-ic{font-size:15px;line-height:1.5;}'
+   + '.al-body{flex:1;min-width:0;}'
+   + '.al-tt{font-family:"Kanit";font-weight:700;font-size:14px;color:#1A1A1A;}'
+   + '.al-ms{font-family:"Sarabun";font-size:13px;color:#6B6456;margin-top:2px;line-height:1.45;}'
+   + '.al-act{display:flex;gap:8px;margin-top:9px;}'
+   + '.al-act button{border:0;border-radius:8px;padding:6px 14px;font-family:"Sarabun";font-size:12.5px;cursor:pointer;}'
+   + '.al-go{background:#1A1A1A;color:#FFC629;}'
+   + '.al-ask{background:#FFF3CC;color:#1A1A1A;border:1px solid #F0E2B0;}'
+   + '</style>'
+   + '<button class="maru-bell" id="maruBell" aria-label="แจ้งเตือน">'
+   +   '<svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>'
+   +   '<span class="maru-bell-badge" id="maruBellBadge"></span>'
+   + '</button>'
+   + '<div class="maru-al-ov" id="maruAlOv"><div class="maru-al-panel">'
+   +   '<div class="maru-al-head"><div class="t">🔔 แจ้งเตือนจากมารุ</div><button id="maruAlX">✕</button></div>'
+   +   '<div class="maru-al-list" id="maruAlList"></div>'
+   + '</div></div>';
+}
+
+async function bindMaruAlerts(currentPage){
+  var bell = document.getElementById('maruBell');
+  var badge = document.getElementById('maruBellBadge');
+  var ov = document.getElementById('maruAlOv');
+  var list = document.getElementById('maruAlList');
+  var xb = document.getElementById('maruAlX');
+  if(!bell || !ov) return;
+  var seen = []; try{ seen = JSON.parse(localStorage.getItem('maruAlertsSeen') || '[]'); }catch(e){}
+  var current = [];
+  function unread(){ return current.filter(function(a){ return seen.indexOf(a.id) < 0; }).length; }
+  function paint(){ var n = unread(); if(n > 0){ badge.textContent = n > 9 ? '9+' : String(n); badge.style.display = 'flex'; } else { badge.style.display = 'none'; } }
+  function render(){
+    if(!current.length){ list.innerHTML = '<div class="al-empty">🎉 ไม่มีแจ้งเตือน<br>ทุกอย่างปกติดีครับ</div>'; return; }
+    list.innerHTML = current.map(function(a){
+      return '<div class="al-item ' + (a.level || 'info') + '"><div class="al-ic">' + (a.icon || '🔔') + '</div>'
+        + '<div class="al-body"><div class="al-tt">' + escHtml(a.title || '') + '</div>'
+        + (a.msg ? '<div class="al-ms">' + escHtml(a.msg) + '</div>' : '')
+        + '<div class="al-act">'
+        + (a.page ? '<button class="al-go" data-pg="' + escHtml(a.page) + '">ดู</button>' : '')
+        + '<button class="al-ask" data-q="' + escHtml((a.title || '') + '. ' + (a.msg || '')) + '">ถามมารุ</button>'
+        + '</div></div></div>';
+    }).join('');
+    list.querySelectorAll('.al-go').forEach(function(b){ b.addEventListener('click', function(){ var pg = b.getAttribute('data-pg'); if(pg) window.location.href = pg; }); });
+    list.querySelectorAll('.al-ask').forEach(function(b){ b.addEventListener('click', function(){ askMaru(b.getAttribute('data-q')); }); });
+  }
+  function markSeen(){ current.forEach(function(a){ if(seen.indexOf(a.id) < 0) seen.push(a.id); }); if(seen.length > 200) seen = seen.slice(-200); try{ localStorage.setItem('maruAlertsSeen', JSON.stringify(seen)); }catch(e){} paint(); }
+  bell.addEventListener('click', function(){ ov.classList.add('show'); render(); markSeen(); });
+  xb.addEventListener('click', function(){ ov.classList.remove('show'); });
+  ov.addEventListener('click', function(e){ if(e.target === ov) ov.classList.remove('show'); });
+  function askMaru(q){
+    ov.classList.remove('show');
+    var aov = document.getElementById('maruOv'), inp = document.getElementById('maruInp');
+    if(aov && inp && window.maruSend){ aov.classList.add('show'); inp.value = 'เรื่องนี้ควรทำยังไงดี: ' + q; setTimeout(function(){ window.maruSend(); }, 180); }
+    else { window.location.href = 'assistant.html'; }
+  }
+  try{ var r = await api('getAlerts'); if(r && r.alerts){ current = r.alerts; paint(); } }catch(e){}
 }
 
 var maruHistory = [];
