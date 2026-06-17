@@ -288,13 +288,23 @@ function maruAssistantMarkup(currentPage){
    + '.maru-cap-h{font-weight:700;color:#C8901A;font-size:13px;margin-bottom:4px;font-family:"Kanit";}'
    + '.maru-cap-b{white-space:pre-wrap;color:#1A1A1A;font-size:14px;line-height:1.5;font-family:"Sarabun";}'
    + '.maru-cap-copy{margin-top:8px;background:#FFC629;border:none;border-radius:999px;padding:5px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:"Sarabun";color:#1A1A1A;}'
+   + '.maru-poster{align-self:flex-start;max-width:92%;display:flex;flex-direction:column;}'
+   + '.maru-poster img{width:100%;max-width:300px;border-radius:12px;border:1px solid #ECE6D6;display:block;}'
+   + '.maru-poster .pl{font-size:12px;color:#8A8170;margin:5px 2px 2px;font-family:"Sarabun";}'
+   + '.maru-dl{display:inline-block;margin-top:6px;background:#1A1A1A;color:#FFC629;border-radius:999px;padding:7px 16px;font-weight:700;font-size:13px;text-decoration:none;font-family:"Sarabun";align-self:flex-start;}'
    + '.maru-dots{align-self:flex-start;background:#fff;border:1px solid #ECE6D6;border-radius:14px;padding:11px 14px;display:flex;gap:4px;}'
    + '.maru-dots span{width:7px;height:7px;border-radius:50%;background:#C9C1AE;animation:marubz 1.2s infinite;}'
    + '.maru-dots span:nth-child(2){animation-delay:.2s;}.maru-dots span:nth-child(3){animation-delay:.4s;}'
    + '@keyframes marubz{0%,60%,100%{opacity:.3;transform:translateY(0);}30%{opacity:1;transform:translateY(-4px);}}'
+   + '.maru-attchip{display:none;align-items:center;gap:9px;margin:8px 12px 0;padding:6px 9px;background:#FFF7E0;border:1px solid #F2E2A8;border-radius:11px;}'
+   + '.maru-attchip.show{display:flex;}'
+   + '.maru-attchip img{width:40px;height:40px;object-fit:cover;border-radius:8px;}'
+   + '.maru-attchip .nm{flex:1;font-size:12px;color:#6B6456;font-family:"Sarabun";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
+   + '.maru-attchip .rm{border:0;background:#F1E4BC;color:#7A6A2E;border-radius:8px;padding:5px 11px;font-size:12px;font-family:"Sarabun";cursor:pointer;}'
    + '.maru-in{display:flex;gap:7px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));align-items:flex-end;border-top:1px solid #ECE6D6;background:#FAF8F1;}'
    + '.maru-in textarea{flex:1;resize:none;border:1.5px solid #ECE6D6;border-radius:13px;padding:10px 13px;font-family:"Sarabun";font-size:14px;max-height:110px;line-height:1.4;background:#fff;color:#1A1A1A;}'
    + '.maru-in textarea:focus{outline:none;border-color:#FFC629;}'
+   + '.maru-att{width:42px;height:42px;border-radius:50%;border:1.5px solid #ECE6D6;background:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;}'
    + '.maru-mic{width:42px;height:42px;border-radius:50%;border:1.5px solid #ECE6D6;background:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}'
    + '.maru-wave{display:inline-flex;align-items:center;gap:2.5px;height:18px;}'
    + '.maru-wave i{width:3px;height:7px;background:#1A1A1A;border-radius:2px;animation:maruwv 1.1s infinite ease-in-out;}'
@@ -315,8 +325,11 @@ function maruAssistantMarkup(currentPage){
    +     '<div class="cfg-row"><span>ความเร็ว</span><input type="range" id="maruRateSel" min="0.7" max="1.4" step="0.1"></div>'
    +     '<label class="cfg-mute"><input type="checkbox" id="maruMuteChk"> ปิดเสียงพูด</label>'
    +   '</div>'
-   +   '<div class="maru-msgs" id="maruMsgs"><div class="maru-hi">สวัสดีครับ 🐤 ถามหรือคุยเล่นได้เลย<br>กดไมค์ 🎤 พูดก็ได้นะ</div></div>'
+   +   '<div class="maru-msgs" id="maruMsgs"><div class="maru-hi">สวัสดีครับ 🐤 ถามหรือคุยเล่นได้เลย<br>อยากได้โพสต์ขายของ แนบรูป 📎 แล้วพิมพ์ เช่น "ทำโพสต์ ลด 20%"</div></div>'
+   +   '<div class="maru-attchip" id="maruAttChip"><img id="maruAttThumb" alt=""><span class="nm" id="maruAttName">รูปแนบ</span><button class="rm" id="maruAttRm">ลบ</button></div>'
    +   '<div class="maru-in">'
+   +     '<button class="maru-att" id="maruAtt" title="แนบรูปทำโพสต์">📎</button>'
+   +     '<input type="file" accept="image/*" id="maruImgInput" style="display:none">'
    +     '<button class="maru-mic" id="maruMic" title="พูด"><span class="maru-wave"><i></i><i></i><i></i><i></i></span></button>'
    +     '<textarea id="maruInp" rows="1" placeholder="พิมพ์ หรือกดไมค์พูด..."></textarea>'
    +     '<button class="maru-send" id="maruSend">➤</button>'
@@ -448,6 +461,97 @@ function maruPlay(text){
   }catch(e){}
 }
 
+// ===== เฟส 2: เครื่องมือวาดรูปโปสเตอร์ (Canvas — ฟรี ไม่กินเครดิต) =====
+var maruLogoImg = null, maruLogoTried = false;
+function maruEnsureLogo(cb){
+  if(maruLogoImg) return cb(maruLogoImg);
+  if(maruLogoTried) return cb(null);
+  maruLogoTried = true;
+  var lg = new Image();
+  lg.onload = function(){ maruLogoImg = lg; cb(lg); };
+  lg.onerror = function(){ cb(null); };
+  lg.src = 'maru-chick.png';
+}
+function maruRoundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+function maruFitFont(ctx, text, maxW, startPx, weight, family, minPx){
+  var px = startPx; minPx = minPx || 20;
+  ctx.font = weight + ' ' + px + 'px ' + family;
+  while(px > minPx && ctx.measureText(text).width > maxW){ px -= 2; ctx.font = weight + ' ' + px + 'px ' + family; }
+  return px;
+}
+function maruDrawPoster(imgEl, logoEl, W, H, poster){
+  var KANIT = 'Kanit, Sarabun, sans-serif', SARA = 'Sarabun, sans-serif';
+  var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  var ctx = cv.getContext('2d');
+  // วาดรูปแบบ cover เต็มพื้นที่
+  var ir = imgEl.width / imgEl.height, cr = W / H, dw, dh, dx, dy;
+  if(ir > cr){ dh = H; dw = H * ir; dx = (W - dw) / 2; dy = 0; }
+  else { dw = W; dh = W / ir; dx = 0; dy = (H - dh) / 2; }
+  ctx.drawImage(imgEl, dx, dy, dw, dh);
+  // ไล่เฉดมืดด้านล่างให้ตัวอักษรอ่านง่าย
+  var g = ctx.createLinearGradient(0, H * 0.4, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.6, 'rgba(0,0,0,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0.82)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  var pad = Math.round(W * 0.06);
+  poster = poster || {};
+  var headline = String(poster.headline || '').trim();
+  var menu = String(poster.menu || '').trim();
+  var price = String(poster.price || '').trim();
+  var note = String(poster.note || '').trim();
+  // แบรนด์มุมบนซ้าย (โลโก้ + ชื่อร้าน)
+  var logoSz = Math.round(W * 0.11);
+  if(logoEl){
+    try{ ctx.save(); ctx.beginPath(); ctx.arc(pad + logoSz / 2, pad + logoSz / 2, logoSz / 2, 0, Math.PI * 2); ctx.closePath(); ctx.clip(); ctx.drawImage(logoEl, pad, pad, logoSz, logoSz); ctx.restore(); }catch(e){}
+  }
+  ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+  ctx.font = '700 ' + Math.round(W * 0.045) + 'px ' + KANIT;
+  ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8;
+  ctx.fillText('Maru Waffle', pad + (logoEl ? logoSz + 14 : 0), pad + logoSz / 2);
+  ctx.shadowBlur = 0;
+  // ป้ายราคามุมบนขวา (สีแดงเด่น)
+  if(price){
+    ctx.font = '800 ' + Math.round(W * 0.058) + 'px ' + KANIT;
+    var pw = ctx.measureText(price).width;
+    var pillH = Math.round(W * 0.135), pillW = pw + Math.round(W * 0.10);
+    var px2 = W - pad - pillW, py2 = pad;
+    ctx.fillStyle = '#E63329';
+    maruRoundRect(ctx, px2, py2, pillW, pillH, pillH / 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(price, px2 + pillW / 2, py2 + pillH / 2);
+    ctx.textAlign = 'left';
+  }
+  // ข้อความล่าง: note (เล็กสุด) → menu → headline (ใหญ่สุด)
+  var y = H - pad;
+  ctx.textBaseline = 'alphabetic';
+  if(note){
+    ctx.font = '500 ' + Math.round(W * 0.034) + 'px ' + SARA;
+    ctx.fillStyle = '#FFE7A3'; ctx.fillText(note, pad, y);
+    y -= Math.round(W * 0.058);
+  }
+  if(menu){
+    var mp = maruFitFont(ctx, menu, W - pad * 2, Math.round(W * 0.052), '600', KANIT, 24);
+    ctx.font = '600 ' + mp + 'px ' + KANIT; ctx.fillStyle = '#fff';
+    ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 8;
+    ctx.fillText(menu, pad, y); ctx.shadowBlur = 0;
+    y -= Math.round(mp * 1.2);
+  }
+  if(headline){
+    var hp = maruFitFont(ctx, headline, W - pad * 2, Math.round(W * 0.12), '800', KANIT, 36);
+    ctx.font = '800 ' + hp + 'px ' + KANIT; ctx.fillStyle = '#FFC629';
+    ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 12;
+    ctx.fillText(headline, pad, y); ctx.shadowBlur = 0;
+  }
+  return cv.toDataURL('image/png');
+}
+
 function bindMaruAssistant(currentPage){
   if(currentPage === 'assistant') return;
   var fab = document.getElementById('maruFab');
@@ -498,6 +602,36 @@ function bindMaruAssistant(currentPage){
   inp.addEventListener('input', function(){ inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,110)+'px'; });
   inp.addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); maruSend(); } });
   sendB.addEventListener('click', function(){ maruSend(); });
+
+  // ===== เฟส 2: แนบรูปทำโพสต์ =====
+  var attB = document.getElementById('maruAtt');
+  var imgInput = document.getElementById('maruImgInput');
+  var attChip = document.getElementById('maruAttChip');
+  var attThumb = document.getElementById('maruAttThumb');
+  var attName = document.getElementById('maruAttName');
+  var attRm = document.getElementById('maruAttRm');
+  var maruPromoImg = null;   // { imgEl, dataURL, name }
+  function clearAtt(){ maruPromoImg = null; if(attChip) attChip.classList.remove('show'); }
+  if(attB && imgInput){
+    attB.addEventListener('click', function(){ imgInput.click(); });
+    imgInput.addEventListener('change', function(){
+      var f = this.files && this.files[0]; this.value = '';
+      if(!f) return;
+      var rd = new FileReader();
+      rd.onload = function(){
+        var im = new Image();
+        im.onload = function(){
+          maruPromoImg = { imgEl: im, dataURL: rd.result, name: f.name || 'รูปแนบ' };
+          if(attThumb) attThumb.src = rd.result;
+          if(attName) attName.textContent = f.name || 'รูปแนบ';
+          if(attChip) attChip.classList.add('show');
+        };
+        im.src = rd.result;
+      };
+      rd.readAsDataURL(f);
+    });
+  }
+  if(attRm) attRm.addEventListener('click', clearAtt);
 
   // ไมโครโฟน (ถ้าอุปกรณ์รองรับ)
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -562,27 +696,59 @@ function bindMaruAssistant(currentPage){
     wrap.appendChild(head); wrap.appendChild(body); wrap.appendChild(btn);
     msgs.appendChild(wrap); msgs.scrollTop = msgs.scrollHeight;
   }
+  function maruAddPoster(label, dataURL){
+    var hi = msgs.querySelector('.maru-hi'); if(hi) hi.remove();
+    var wrap = document.createElement('div'); wrap.className = 'maru-poster';
+    var im = document.createElement('img'); im.src = dataURL; im.alt = 'โปสเตอร์';
+    var pl = document.createElement('div'); pl.className = 'pl'; pl.textContent = label;
+    var a = document.createElement('a'); a.className = 'maru-dl'; a.href = dataURL; a.download = 'maru-promo.png'; a.textContent = '⬇ ดาวน์โหลดรูป';
+    wrap.appendChild(im); wrap.appendChild(pl); wrap.appendChild(a);
+    msgs.appendChild(wrap); msgs.scrollTop = msgs.scrollHeight;
+  }
+  function maruMakePosters(imgEl, poster, chans){
+    var needSquare = chans.length === 0 || chans.indexOf('facebook') >= 0 || chans.indexOf('line') >= 0 || chans.indexOf('instagram') >= 0;
+    var needVert = chans.indexOf('tiktok') >= 0;
+    if(!needSquare && !needVert) needSquare = true;
+    maruEnsureLogo(function(logo){
+      function build(){
+        if(needSquare){ try{ maruAddPoster('จัตุรัส 1:1 (Facebook / Instagram / LINE)', maruDrawPoster(imgEl, logo, 1080, 1080, poster)); }catch(e){} }
+        if(needVert){ try{ maruAddPoster('แนวตั้ง 9:16 (TikTok / Story)', maruDrawPoster(imgEl, logo, 1080, 1920, poster)); }catch(e){} }
+      }
+      if(document.fonts && document.fonts.ready){ document.fonts.ready.then(build).catch(build); }
+      else build();
+    });
+  }
   async function maruPromo(text){
     var chans = maruChannelsFrom(text);
+    var img = maruPromoImg;   // เก็บไว้ก่อนเคลียร์
     try{
       var r = await api('genPromoCaption', { brief:text, channels:chans });
       maruNoDots();
       if(r.ok && r.captions){
-        maruAdd('นี่คือแคปชั่นที่ร่างให้ครับ 🐤 กดคัดลอกแล้วเอาไปโพสต์ได้เลย','ai');
+        maruAdd('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่น/ดาวน์โหลดรูปไปโพสต์ได้เลย','ai');
         var caps = r.captions;
         var order = (r.channels && r.channels.length) ? r.channels : Object.keys(caps);
         var shown = 0;
         order.forEach(function(ch){
+          if(ch === 'poster' || ch === 'raw') return;
           if(caps[ch]){ maruAddCaption(MARU_CHAN_LABEL[ch] || ch, String(caps[ch])); shown++; }
         });
         if(!shown && caps.raw) maruAdd(String(caps.raw),'ai');
-        else if(!shown) maruAdd('สร้างแคปชั่นไม่สำเร็จ ลองพิมพ์รายละเอียดเพิ่มอีกนิดนะครับ','er');
+        // สร้างรูปโปสเตอร์ถ้ามีรูปแนบ
+        if(img && img.imgEl){
+          var poster = caps.poster || {};
+          if(!poster.headline && !poster.menu && !poster.price){
+            poster = { menu: text.length > 28 ? text.slice(0, 28) + '…' : text };
+          }
+          maruMakePosters(img.imgEl, poster, chans);
+        }
       } else {
-        maruAdd(r.error || 'สร้างแคปชั่นไม่สำเร็จ ลองใหม่นะครับ','er');
+        maruAdd(r.error || 'สร้างไม่สำเร็จ ลองใหม่นะครับ','er');
       }
     }catch(e){
       maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er');
     }
+    clearAtt();   // เคลียร์รูปแนบหลังใช้
   }
 
   window.maruSend = async function(forceText){
@@ -591,7 +757,7 @@ function bindMaruAssistant(currentPage){
     maruBusy=true; sendB.disabled=true;
     if(typeof forceText !== 'string'){ maruAdd(text,'me'); inp.value=''; inp.style.height='auto'; }
     maruDots();
-    if(maruIsPromo(text)){ await maruPromo(text); maruBusy=false; sendB.disabled=false; return; }
+    if(maruIsPromo(text) || maruPromoImg){ await maruPromo(text); maruBusy=false; sendB.disabled=false; return; }
     try{
       var owner = '';
       try{ owner = sessionStorage.getItem('maruOwner') || ''; }catch(e){}
