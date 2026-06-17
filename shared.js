@@ -693,6 +693,10 @@ function bindMaruAssistant(currentPage){
   function maruWantsAiImage(text){
     return /วาดรูป|วาดภาพ|สร้างภาพ|แต่งรูป|แต่งภาพ|ทำภาพใหม่|ภาพใหม่|ภาพ ?ai|ai ?image|เจน(เนอ)?เรท|ออกแบบภาพ|ครีเอทภาพ|แต่งฉาก/i.test(text);
   }
+  // เฟส 3: ขอเฉพาะรูป — ไม่ใส่ข้อความ/ราคา/โลโก้ทับด้วย Canvas
+  function maruWantsPlainImage(text){
+    return /ไม่ใส่ข้อความ|ไม่ต้องใส่ข้อความ|ไม่ต้องข้อความ|ไม่เอาข้อความ|ไม่ใส่ตัวหนังสือ|รูปเปล่า|ภาพเปล่า|แค่แต่งรูป|แต่งรูปเฉย|เฉพาะรูป|เอาแต่รูป|ไม่ต้องโพสเตอร์|ไม่ต้องราคา|ไม่ต้องโลโก|ไม่.{0,15}canvas|plain|raw/i.test(text);
+  }
   var MARU_CHAN_LABEL = { facebook:'Facebook', line:'LINE', instagram:'Instagram', tiktok:'TikTok' };
   function maruAddCaption(label, text){
     var hi = msgs.querySelector('.maru-hi'); if(hi) hi.remove();
@@ -741,6 +745,25 @@ function bindMaruAssistant(currentPage){
     var chans = maruChannelsFrom(text);
     var img = maruPromoImg;   // เก็บไว้ก่อนเคลียร์
     var wantAi = maruWantsAiImage(text);
+    var plain = maruWantsPlainImage(text);
+
+    // โหมดแต่งรูปเปล่า — ให้ AI แต่งรูปอย่างเดียว ไม่ใส่ข้อความ/แคปชั่น
+    if(wantAi && plain){
+      try{
+        var pl = { prompt: text };
+        if(img && img.dataURL){ pl.imageBase64 = img.dataURL.split(',')[1] || ''; pl.mime = (img.dataURL.match(/^data:(.*?);/) || [])[1] || 'image/jpeg'; }
+        var ip = await api('genPromoImage', pl);
+        maruNoDots();
+        if(ip && ip.ok && ip.image){
+          maruAdd('แต่งรูปให้แล้วครับ 🐤 (ภาพประกอบ AI ไม่ได้ใส่ข้อความ)','ai');
+          maruAddPoster('ภาพ AI (ไม่มีข้อความ)', ip.image);
+        } else {
+          maruAdd((ip && ip.error) || 'แต่งรูปไม่สำเร็จ ลองใหม่นะครับ','er');
+        }
+      }catch(e){ maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er'); }
+      clearAtt();
+      return;
+    }
     try{
       var r = await api('genPromoCaption', { brief:text, channels:chans });
       maruNoDots();
@@ -781,8 +804,9 @@ function bindMaruAssistant(currentPage){
           if(img && img.imgEl) maruMakePosters(img.imgEl, poster, chans, false);   // สำรอง: ใช้รูปจริง
         }
       } else if(img && img.imgEl){
-        // เฟส 2: รูปจริง + ใส่ข้อความด้วย Canvas
-        maruMakePosters(img.imgEl, poster, chans, false);
+        // เฟส 2: รูปจริง + ใส่ข้อความด้วย Canvas (หรือรูปเปล่าถ้าผู้ใช้ขอไม่ใส่ข้อความ)
+        if(plain){ maruAddPoster('รูปที่แนบ (ไม่ใส่ข้อความ)', img.dataURL); }
+        else { maruMakePosters(img.imgEl, poster, chans, false); }
       }
     }catch(e){
       maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er');
