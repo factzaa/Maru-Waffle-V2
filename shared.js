@@ -470,7 +470,7 @@ function maruEnsureLogo(cb){
   var lg = new Image();
   lg.onload = function(){ maruLogoImg = lg; cb(lg); };
   lg.onerror = function(){ cb(null); };
-  lg.src = 'apple-touch-icon.png';   // โลโก้แบรนด์สำหรับโปสเตอร์ (คนละไฟล์กับปุ่มลอย maru-chick.png)
+  lg.src = 'icon-512.png';   // โลโก้แบรนด์สำหรับโปสเตอร์ (คนละไฟล์กับปุ่มลอย maru-chick.png)
 }
 function maruRoundRect(ctx, x, y, w, h, r){
   ctx.beginPath();
