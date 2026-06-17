@@ -284,6 +284,10 @@ function maruAssistantMarkup(currentPage){
    + '.maru-b.me{align-self:flex-end;background:#FFC629;color:#1A1A1A;border-bottom-right-radius:4px;}'
    + '.maru-b.ai{align-self:flex-start;background:#fff;border:1px solid #ECE6D6;color:#1A1A1A;border-bottom-left-radius:4px;}'
    + '.maru-b.er{align-self:center;background:#FEF2F2;color:#B91C1C;font-size:12.5px;text-align:center;}'
+   + '.maru-cap{align-self:flex-start;background:#FFFCEF;border:1px solid #F2E2A8;border-radius:14px;padding:10px 12px;max-width:90%;}'
+   + '.maru-cap-h{font-weight:700;color:#C8901A;font-size:13px;margin-bottom:4px;font-family:"Kanit";}'
+   + '.maru-cap-b{white-space:pre-wrap;color:#1A1A1A;font-size:14px;line-height:1.5;font-family:"Sarabun";}'
+   + '.maru-cap-copy{margin-top:8px;background:#FFC629;border:none;border-radius:999px;padding:5px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:"Sarabun";color:#1A1A1A;}'
    + '.maru-dots{align-self:flex-start;background:#fff;border:1px solid #ECE6D6;border-radius:14px;padding:11px 14px;display:flex;gap:4px;}'
    + '.maru-dots span{width:7px;height:7px;border-radius:50%;background:#C9C1AE;animation:marubz 1.2s infinite;}'
    + '.maru-dots span:nth-child(2){animation-delay:.2s;}.maru-dots span:nth-child(3){animation-delay:.4s;}'
@@ -525,12 +529,69 @@ function bindMaruAssistant(currentPage){
   function maruDots(){ var d=document.createElement('div'); d.className='maru-dots'; d.id='maruDots'; d.innerHTML='<span></span><span></span><span></span>'; msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight; }
   function maruNoDots(){ var d=document.getElementById('maruDots'); if(d) d.remove(); }
 
+  // ===== เฟส 1: สร้างแคปชั่นโพสต์การตลาด (แยกอิสระจาก askAI) =====
+  function maruIsPromo(text){
+    return /ทำโพสต์|สร้างโพสต์|ขอโพสต์|แคปชั่น|caption|โพสต์ขาย|โพสต์โปร|ทำโฆษณา|เขียนโฆษณา|โปรโมชั่น/i.test(text);
+  }
+  function maruChannelsFrom(text){
+    var c = [];
+    if(/เฟส|เฟซ|facebook|\bfb\b/i.test(text)) c.push('facebook');
+    if(/ไลน์|line/i.test(text)) c.push('line');
+    if(/ไอจี|\big\b|instagram|อินสตา/i.test(text)) c.push('instagram');
+    if(/ติ๊?กต็?อก|ติ้กต็อก|tiktok/i.test(text)) c.push('tiktok');
+    return c;
+  }
+  var MARU_CHAN_LABEL = { facebook:'Facebook', line:'LINE', instagram:'Instagram', tiktok:'TikTok' };
+  function maruAddCaption(label, text){
+    var hi = msgs.querySelector('.maru-hi'); if(hi) hi.remove();
+    var wrap = document.createElement('div'); wrap.className = 'maru-cap';
+    var head = document.createElement('div'); head.className = 'maru-cap-h'; head.textContent = label;
+    var body = document.createElement('div'); body.className = 'maru-cap-b'; body.textContent = text;
+    var btn = document.createElement('button'); btn.className = 'maru-cap-copy'; btn.textContent = 'คัดลอก';
+    btn.addEventListener('click', function(){
+      function done(){ btn.textContent='คัดลอกแล้ว ✓'; setTimeout(function(){ btn.textContent='คัดลอก'; }, 1500); }
+      function fallbackCopy(){
+        var ta=document.createElement('textarea'); ta.value=text;
+        ta.style.cssText='position:fixed;left:-9999px;'; document.body.appendChild(ta);
+        ta.select(); try{ document.execCommand('copy'); }catch(_){ } ta.remove(); done();
+      }
+      if(navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(text).then(done).catch(fallbackCopy);
+      } else { fallbackCopy(); }
+    });
+    wrap.appendChild(head); wrap.appendChild(body); wrap.appendChild(btn);
+    msgs.appendChild(wrap); msgs.scrollTop = msgs.scrollHeight;
+  }
+  async function maruPromo(text){
+    var chans = maruChannelsFrom(text);
+    try{
+      var r = await api('genPromoCaption', { brief:text, channels:chans });
+      maruNoDots();
+      if(r.ok && r.captions){
+        maruAdd('นี่คือแคปชั่นที่ร่างให้ครับ 🐤 กดคัดลอกแล้วเอาไปโพสต์ได้เลย','ai');
+        var caps = r.captions;
+        var order = (r.channels && r.channels.length) ? r.channels : Object.keys(caps);
+        var shown = 0;
+        order.forEach(function(ch){
+          if(caps[ch]){ maruAddCaption(MARU_CHAN_LABEL[ch] || ch, String(caps[ch])); shown++; }
+        });
+        if(!shown && caps.raw) maruAdd(String(caps.raw),'ai');
+        else if(!shown) maruAdd('สร้างแคปชั่นไม่สำเร็จ ลองพิมพ์รายละเอียดเพิ่มอีกนิดนะครับ','er');
+      } else {
+        maruAdd(r.error || 'สร้างแคปชั่นไม่สำเร็จ ลองใหม่นะครับ','er');
+      }
+    }catch(e){
+      maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er');
+    }
+  }
+
   window.maruSend = async function(forceText){
     var text = (typeof forceText === 'string') ? forceText : inp.value.trim();
     if(!text || maruBusy) return;
     maruBusy=true; sendB.disabled=true;
     if(typeof forceText !== 'string'){ maruAdd(text,'me'); inp.value=''; inp.style.height='auto'; }
     maruDots();
+    if(maruIsPromo(text)){ await maruPromo(text); maruBusy=false; sendB.disabled=false; return; }
     try{
       var owner = '';
       try{ owner = sessionStorage.getItem('maruOwner') || ''; }catch(e){}
