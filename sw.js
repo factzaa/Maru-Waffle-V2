@@ -1,6 +1,6 @@
 // Maru Waffle Service Worker
 // version: bump เลขเมื่ออัปเดต index.html เพื่อให้ client โหลดเวอร์ชันใหม่
-const CACHE_VERSION = 'maru-waffle-v45';
+const CACHE_VERSION = 'maru-waffle-v46';
 const CACHE_FILES = ['./', './index.html', './records.html', './expenses-report.html',
                      './activities.html',
                      './stock-dashboard.html',
