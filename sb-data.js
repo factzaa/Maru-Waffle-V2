@@ -20,6 +20,36 @@
   const SB_DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
   const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
 
+  // ย่อ/บีบรูปก่อนอัป (records.html ใช้ตัวนี้ทำพรีวิว+อัป) — เผื่อหน้านี้ไม่ได้โหลด shared.js
+  window.maruCompressImage = function (file, maxDim, quality) {
+    maxDim = maxDim || 1280; quality = quality || 0.8;
+    return new Promise(function (resolve) {
+      if (!file) { resolve(null); return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var raw = reader.result;
+        function rawResult() { return { base64: String(raw).split(',')[1] || '', mime: file.type || 'image/jpeg', name: file.name || 'receipt', dataUrl: raw }; }
+        var img = new Image();
+        img.onload = function () {
+          try {
+            var w = img.width, h = img.height;
+            if (Math.max(w, h) > maxDim) { var sc = maxDim / Math.max(w, h); w = Math.round(w * sc); h = Math.round(h * sc); }
+            var c = document.createElement('canvas'); c.width = w; c.height = h;
+            c.getContext('2d').drawImage(img, 0, 0, w, h);
+            var dataUrl = c.toDataURL('image/jpeg', quality);
+            var base64 = dataUrl.split(',')[1] || '';
+            if (!base64 || base64.length >= String(raw).length) { resolve(rawResult()); return; }
+            resolve({ base64: base64, mime: 'image/jpeg', name: (file.name || 'receipt').replace(/\.[^.]+$/, '') + '.jpg', dataUrl: dataUrl });
+          } catch (e) { resolve(rawResult()); }
+        };
+        img.onerror = function () { resolve(rawResult()); };
+        img.src = raw;
+      };
+      reader.onerror = function () { resolve(null); };
+      reader.readAsDataURL(file);
+    });
+  };
+
   async function sbGet(path) {
     const res = await fetch(SB_URL + '/rest/v1/' + path, { headers: H });
     if (!res.ok) throw new Error('Supabase ' + res.status + ': ' + (await res.text()).slice(0, 150));
@@ -167,7 +197,7 @@
     } catch (e) { return { ok: false, error: String(e.message || e) }; }
   }
 
-  window.SB_ACTIONS = {
+  var ACTIONS = {
     getConfig: getConfig,
     getDailyReport: getDailyReport,
     getExpensesReport: getExpensesReport,
@@ -175,4 +205,12 @@
     addBusinessExpense: addBusinessExpense,
     saveDailyReport: saveDailyReport
   };
+
+  // เขียนทับ api() ของ records ทั้งหมด → ทุก action วิ่งเข้า Supabase เท่านั้น (ตัดขาด Apps Script)
+  window.SB_ACTIONS = ACTIONS;
+  window.api = async function (action, params) {
+    if (ACTIONS[action]) return ACTIONS[action](params || {});
+    throw new Error('v2 ยังไม่รองรับ action นี้ (ตัดจาก Apps Script แล้ว): ' + action);
+  };
+  console.log('✅ sb-data.js โหลดแล้ว — records ใช้ Supabase ล้วน (ตัด Apps Script)');
 })();
