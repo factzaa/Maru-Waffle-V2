@@ -466,6 +466,34 @@ async function sbGetStockDashboard(p){
     summary:{ totalWdTx:totalWdTx, totalWdQty:Math.round(totalWdQty*100)/100, totalRcTx:totalRcTx, totalRcQty:Math.round(totalRcQty*100)/100, totalWasted:Math.round(totalWasted*100)/100, activeItems:activeItems, movedItems:Object.keys(stats).length, deadItems:deadStock.length, lowStockItems:lowStockItems, outOfStockItems:outOfStockItems, avgWdPerDay:Math.round(totalWdTx/days*10)/10 },
     topWithdrawn:topWithdrawn, topReceived:topReceived, topWasted:topWasted, deadStock:deadStock, forecast:forecast, dailyMovement:dailyMovement, weekdayPattern:weekdayPattern };
 }
+
+async function sbGetAttendStaff(p){
+  const rows = await sbFetch('staff_safe?select=*');
+  const list = rows.filter(function(r){ return r.staff_id; }).map(function(r){
+    return { id:r.staff_id, name:r.name, nickname:r.nickname, position:r.position, branch:r.branch,
+             hasFace:!!r.has_face, active:r.active!==false, type:r.emp_type||'', startDate:r.start_date||'' };
+  });
+  const includeInactive = p && p.includeInactive;
+  return { staff: includeInactive ? list : list.filter(function(x){ return x.active; }) };
+}
+ 
+async function sbGetAttendReport(p){
+  const start = (p && p.start) || '0000-01-01', end = (p && p.end) || '9999-12-31';
+  const staffId = p && p.staffId, type = p && p.type;
+  const rows = await sbFetch('attendance?select=att_date,att_time,type,staff_id,name,branch,lat,lng,address,photo_url,in_geofence,distance,note&order=att_date.desc');
+  const logs = [];
+  rows.forEach(function(r){
+    const d = r.att_date; if(d < start || d > end) return;
+    if(staffId && r.staff_id !== staffId) return;
+    if(type && type !== 'all' && r.type !== type) return;
+    logs.push({ date:d, dateDM:sbDM(d), time:sbFmtTime(r.att_time), type:r.type,
+      staffId:r.staff_id, staff:r.name, branch:r.branch,
+      lat:Number(r.lat)||0, lng:Number(r.lng)||0, address:r.address,
+      imgUrl:r.photo_url, inGeofence:r.in_geofence!==false, distance:Number(r.distance)||0, note:r.note });
+  });
+  logs.sort(function(a,b){ const k=b.date.localeCompare(a.date); return k!==0?k:String(b.time).localeCompare(String(a.time)); });
+  return { logs:logs, summary:{ count:logs.length, inCount:logs.filter(function(x){return x.type==='in';}).length, outCount:logs.filter(function(x){return x.type==='out';}).length } };
+}
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
@@ -474,7 +502,9 @@ const SB_ACTIONS = {
   getExpensesReport: sbGetExpensesReport,
   getActivityFeed: sbGetActivityFeed,
   getStockItems: sbGetStockItems,
-  getStockDashboard: sbGetStockDashboard
+  getStockDashboard: sbGetStockDashboard,
+  getAttendStaff: sbGetAttendStaff,
+  getAttendReport: sbGetAttendReport
 };
  
 async function api(action, params){
