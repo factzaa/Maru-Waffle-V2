@@ -168,16 +168,15 @@ document.getElementById('rcSearch').addEventListener('input', function(){ rc.fil
 // Receipt picker
 document.getElementById('rcAddReceipt').addEventListener('click', function(){
   setReceiptHandler(function(file){
-    const reader = new FileReader();
-    reader.onload = function(){
-      const dataUrl = reader.result;
-      rc.receipt = { base64: dataUrl.split(',')[1], mime: file.type, name: file.name };
+     maruCompressImage(file).then(function(r){
+      if(!r) return;
+      const dataUrl = r.dataUrl;
+      rc.receipt = { base64: r.base64, mime: r.mime, name: r.name };
       const pv = document.getElementById('rcPreview');
       pv.src = dataUrl; pv.classList.add('show');
       document.getElementById('rcClearReceipt').style.display = '';
       document.getElementById('rcAddReceipt').innerHTML = '✓ แนบบิลแล้ว · เปลี่ยน';
-    };
-    reader.readAsDataURL(file);
+    });
   });
   openReceiptSheet();
 });
