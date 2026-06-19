@@ -417,14 +417,64 @@ async function sbGetActivityFeed(p){
     A.push({ date:d, dateDM:sbDM(d), time:tm, type:'sales', icon:'💰', title:'บันทึกยอดขายวันนี้', detail:'฿'+Math.round(tot).toLocaleString('en-US'), color:'#15803D', ts:d+' '+(tm||'y') }); });
   A.sort(function(a,b){ return b.ts.localeCompare(a.ts); });
   return { range:{ start:start, end:end }, activities:A, count:A.length };
-} 
+}
+
+async function sbGetStockItems(p){
+  const rows = await sbFetch('stock_items?select=*');
+  const items = rows.filter(function(r){ return r.item_id; }).map(function(r){
+    return { id:r.item_id, name:r.name, category:r.category, unit:r.unit, minStock:Number(r.min_stock)||0,
+             order:Number(r.sort_order)||0, mode:r.mode||'withdraw', active:r.active!==false };
+  });
+  const cat = p && p.category;
+  const filtered = (cat && cat !== 'all') ? items.filter(function(x){ return x.category === cat; }) : items;
+  filtered.sort(function(a,b){ return a.order - b.order; });
+  return { items:filtered };
+}
+ 
+async function sbGetStockDashboard(p){
+  const start = (p && p.start) || '0000-01-01', end = (p && p.end) || '9999-12-31';
+  const T = await sbStockTables();
+  const itemsMap = {};
+  T.items.filter(function(r){ return r.item_id; }).forEach(function(r){
+    itemsMap[r.item_id] = { id:r.item_id, name:r.name, category:r.category, unit:r.unit, minStock:Number(r.min_stock)||0, mode:r.mode||'withdraw', active:r.active!==false };
+  });
+  const balanceMap = {}; sbComputeBalances(end,'all',T).items.forEach(function(it){ balanceMap[it.id]=it; });
+  const inR = function(d){ return d>=start && d<=end; };
+  const startD = new Date(start+'T00:00:00'), endD = new Date(end+'T00:00:00');
+  const days = Math.max(1, Math.round((endD-startD)/86400000)+1);
+  const stats = {}; function ensure(id){ if(!stats[id]) stats[id]={id:id,wdQty:0,wdTx:0,rcQty:0,rcTx:0,wasted:0,lastMove:''}; return stats[id]; }
+  let totalWdTx=0, totalWdQty=0; const wdByDate={}, wdByDow=[0,0,0,0,0,0,0];
+  T.wd.forEach(function(r){ if(!inR(r.move_date)) return; const id=r.item_id; if(!id) return; const qty=Number(r.qty)||0; const s=ensure(id); s.wdQty+=qty; s.wdTx++; totalWdTx++; totalWdQty+=qty; const dStr=r.move_date; wdByDate[dStr]=(wdByDate[dStr]||0)+qty; wdByDow[new Date(dStr+'T00:00:00').getDay()]++; if(dStr>s.lastMove) s.lastMove=dStr; });
+  let totalRcTx=0, totalRcQty=0; const rcByDate={};
+  T.rc.forEach(function(r){ if(!inR(r.move_date)) return; const id=r.item_id; if(!id) return; const qty=Number(r.qty)||0; const s=ensure(id); s.rcQty+=qty; s.rcTx++; totalRcTx++; totalRcQty+=qty; const dStr=r.move_date; rcByDate[dStr]=(rcByDate[dStr]||0)+qty; if(dStr>s.lastMove) s.lastMove=dStr; });
+  let totalWasted=0;
+  T.daily.forEach(function(r){ if(!inR(r.move_date)) return; const id=r.item_id; if(!id) return; const waste=Number(r.waste)||0; if(waste>0){ ensure(id).wasted+=waste; totalWasted+=waste; } });
+  const allStats = Object.keys(stats).map(function(id){ const it=itemsMap[id]||{name:id,unit:'',category:''}; const bal=balanceMap[id]||{balance:0,lowStock:false}; return Object.assign({}, stats[id], { name:it.name, unit:it.unit, category:it.category, balance:bal.balance, lowStock:bal.lowStock }); });
+  const topWithdrawn = allStats.filter(function(s){return s.wdQty>0;}).sort(function(a,b){return b.wdQty-a.wdQty;}).slice(0,10);
+  const topReceived = allStats.filter(function(s){return s.rcQty>0;}).sort(function(a,b){return b.rcQty-a.rcQty;}).slice(0,10);
+  const topWasted = allStats.filter(function(s){return s.wasted>0;}).sort(function(a,b){return b.wasted-a.wasted;}).slice(0,10);
+  const movedIds={}; Object.keys(stats).forEach(function(id){ movedIds[id]=true; });
+  const deadStock = Object.keys(itemsMap).filter(function(id){ return itemsMap[id].active!==false && !movedIds[id]; }).map(function(id){ const it=itemsMap[id]; const bal=balanceMap[id]||{balance:0}; return {id:id,name:it.name,unit:it.unit,category:it.category,balance:bal.balance}; }).filter(function(x){return x.balance>0;}).sort(function(a,b){return b.balance-a.balance;}).slice(0,10);
+  const forecast = allStats.filter(function(s){return s.wdQty>0&&s.balance>0;}).map(function(s){ const avgDaily=s.wdQty/days; const daysLeft=avgDaily>0?Math.floor(s.balance/avgDaily):999; return Object.assign({}, s, {avgDaily:Math.round(avgDaily*10)/10, daysLeft:daysLeft}); }).sort(function(a,b){return a.daysLeft-b.daysLeft;}).slice(0,10);
+  const allDates={}; Object.keys(wdByDate).forEach(function(d){allDates[d]=true;}); Object.keys(rcByDate).forEach(function(d){allDates[d]=true;});
+  const dailyMovement = Object.keys(allDates).sort().map(function(d){ return { date:d, dateDM:sbDM(d), withdraws:wdByDate[d]||0, receives:rcByDate[d]||0 }; });
+  const dowNames=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
+  const weekdayPattern = wdByDow.map(function(count,i){ return {dow:dowNames[i], count:count}; });
+  let activeItems=0, lowStockItems=0, outOfStockItems=0;
+  Object.keys(itemsMap).forEach(function(id){ if(itemsMap[id].active===false) return; activeItems++; const bal=balanceMap[id]; if(bal){ if(bal.balance<=0) outOfStockItems++; else if(bal.lowStock) lowStockItems++; } });
+  return { range:{start:start,end:end,days:days},
+    summary:{ totalWdTx:totalWdTx, totalWdQty:Math.round(totalWdQty*100)/100, totalRcTx:totalRcTx, totalRcQty:Math.round(totalRcQty*100)/100, totalWasted:Math.round(totalWasted*100)/100, activeItems:activeItems, movedItems:Object.keys(stats).length, deadItems:deadStock.length, lowStockItems:lowStockItems, outOfStockItems:outOfStockItems, avgWdPerDay:Math.round(totalWdTx/days*10)/10 },
+    topWithdrawn:topWithdrawn, topReceived:topReceived, topWasted:topWasted, deadStock:deadStock, forecast:forecast, dailyMovement:dailyMovement, weekdayPattern:weekdayPattern };
+}
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
   getDashboardData: sbGetDashboardData,
   getStockBalances: sbGetStockBalances,
   getExpensesReport: sbGetExpensesReport,
-  getActivityFeed: sbGetActivityFeed
+  getActivityFeed: sbGetActivityFeed,
+  getStockItems: sbGetStockItems,
+  getStockDashboard: sbGetStockDashboard
 };
  
 async function api(action, params){
