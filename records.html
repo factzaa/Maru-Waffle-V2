@@ -869,6 +869,11 @@
 
   const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxM4wS8A69veJY-4YTXJg2nbQKC-AaG88VDLSfp_SHX9SsUf2yhd6xv4ICKJPyVHnLDeg/exec';
   async function api(action, params){
+    if (typeof SB_ACTIONS !== 'undefined' && SB_ACTIONS[action]) {
+      const _r = await SB_ACTIONS[action](params || {});
+      if (typeof WRITE_INVALIDATES !== 'undefined' && WRITE_INVALIDATES[action] && typeof invalidateCache === 'function') invalidateCache(WRITE_INVALIDATES[action]);
+      return _r;
+    }
     try{
       const res = await fetch(APPS_SCRIPT_URL, {
         method:'POST',
