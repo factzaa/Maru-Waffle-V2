@@ -996,20 +996,7 @@ const BRAND_LOGOS = {
   document.getElementById('rcptSheet').addEventListener('click', function(e){
     if(e.target === this) closeReceiptSheet();
   });
-  document.getElementById('rcptCam').addEventListener('click', function(){
-    closeReceiptSheet();
-    document.getElementById('rcptInputCam').click();
-  });
-  document.getElementById('rcptAlb').addEventListener('click', function(){
-    closeReceiptSheet();
-    document.getElementById('rcptInputAlb').click();
-  });
-  document.getElementById('rcptInputCam').addEventListener('change', function(){
-    handleReceiptFile(this.files[0]); this.value=''; // reset ให้เลือกไฟล์ชื่อเดียวกันซ้ำได้
-  });
-  document.getElementById('rcptInputAlb').addEventListener('change', function(){
-    handleReceiptFile(this.files[0]); this.value='';
-  });
+  setReceiptHandler(handleReceiptFile);
 
   // ใส่ icon ใน sheet (ทำหลัง ICONS โหลด)
   setTimeout(function(){
