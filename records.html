@@ -790,17 +790,16 @@
     document.getElementById('bizAddReceipt').innerHTML = '📎 แนบใบเสร็จ (ไม่บังคับ)';
   });
 
-  function setBizReceipt(file){
-    const reader = new FileReader();
-    reader.onload = function(){
-      const dataUrl = reader.result;
-      bizReceipt = { base64: dataUrl.split(',')[1], mime: file.type, name: file.name, dataUrl: dataUrl };
+   function setBizReceipt(file){
+    maruCompressImage(file).then(function(r){
+      if(!r) return;
+      const dataUrl = r.dataUrl;
+      bizReceipt = { base64: r.base64, mime: r.mime, name: r.name, dataUrl: dataUrl };
       const pv = document.getElementById('bizPreview');
       pv.src = dataUrl; pv.classList.add('show');
       document.getElementById('bizClearReceipt').style.display = '';
       document.getElementById('bizAddReceipt').innerHTML = '✓ แนบใบเสร็จแล้ว · เปลี่ยน';
-    };
-    reader.readAsDataURL(file);
+    });
   }
 
   document.getElementById('bizSave').addEventListener('click', function(){
@@ -983,14 +982,13 @@ const BRAND_LOGOS = {
     if (rcptTargetIdx === -3) { setRcReceipt(file); return; }
     if(rcptTargetIdx < 0) return;
     const i = rcptTargetIdx;
-    const reader=new FileReader();
-    reader.onload=function(){
-      const dataUrl=reader.result;
-      expenses[i].receipt={base64:dataUrl.split(',')[1],mime:file.type,name:file.name};
+    maruCompressImage(file).then(function(r){
+      if(!r) return;
+      const dataUrl = r.dataUrl;
+      expenses[i].receipt={base64:r.base64,mime:r.mime,name:r.name};
       expenses[i].preview=dataUrl; expenses[i].existingUrl='';
       renderExpenses();
-    };
-    reader.readAsDataURL(file);
+    });
   }
 
   // ผูก event ของ sheet (ครั้งเดียวพอ)
