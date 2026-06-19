@@ -790,6 +790,19 @@
     document.getElementById('bizAddReceipt').innerHTML = '📎 แนบใบเสร็จ (ไม่บังคับ)';
   });
 
+// กันพลาด: ถ้า shared.js (cache เก่า) ไม่มี maruCompressImage ใช้ตัวสำรอง
+  if (typeof maruCompressImage === 'undefined') {
+    window.maruCompressImage = function(file){
+      return new Promise(function(res){
+        if(!file){ res(null); return; }
+        var rd = new FileReader();
+        rd.onload = function(){ res({ base64: rd.result.split(',')[1], mime: file.type, name: file.name, dataUrl: rd.result }); };
+        rd.onerror = function(){ res(null); };
+        rd.readAsDataURL(file);
+      });
+    };
+  }
+  
    function setBizReceipt(file){
     maruCompressImage(file).then(function(r){
       if(!r) return;
