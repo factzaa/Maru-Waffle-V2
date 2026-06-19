@@ -494,6 +494,68 @@ async function sbGetAttendReport(p){
   logs.sort(function(a,b){ const k=b.date.localeCompare(a.date); return k!==0?k:String(b.time).localeCompare(String(a.time)); });
   return { logs:logs, summary:{ count:logs.length, inCount:logs.filter(function(x){return x.type==='in';}).length, outCount:logs.filter(function(x){return x.type==='out';}).length } };
 }
+
+async function sbGetConfig(){
+  return { channels: SB_CH, today: sbFmtD(new Date()) };
+}
+ 
+async function sbGetDailyReport(p){
+  const date = p.date;
+  const [salesRows, expRows] = await Promise.all([
+    sbFetch('sales?select=*&sale_date=eq.' + encodeURIComponent(date) + '&limit=1'),
+    sbFetch('expenses?select=exp_date,item,amount,receipt_url,type&exp_date=eq.' + encodeURIComponent(date))
+  ]);
+  let sale = null;
+  if(salesRows.length){
+    const v = salesRows[0]; sale = {};
+    SB_CH.forEach(function(c){ sale[c.key] = v[c.key]; });
+    sale.openingCash = v.cash_open; sale.cashIn = v.cash_in; sale.refund = v.refund;
+    sale.actualCash = v.cash_actual; sale.closeStaff = v.closed_by; sale.note = v.note;
+  }
+  const expenses = [];
+  expRows.forEach(function(r){ if((r.type||'pos')==='pos') expenses.push({ item:r.item, amount:r.amount, existingUrl:r.receipt_url }); });
+  return { date:date, sales:sale, expenses:expenses };
+}
+ 
+async function sbSuggestMinStock(p){
+  const lookbackDays = (p && Number(p.lookbackDays)) || 7;
+  const bufferDays = (p && Number(p.bufferDays)) || 5;
+  const T = await sbStockTables();
+  const items = T.items.filter(function(r){ return r.item_id; }).map(function(r){ return { id:r.item_id }; });
+  const today = new Date(), startD = new Date(today); startD.setDate(startD.getDate() - (lookbackDays - 1));
+  const startStr = sbFmtD(startD), todayStr = sbFmtD(today);
+  const usedSum={}, usedDays={}, wdSum={}, wdDays={};
+  items.forEach(function(it){ usedSum[it.id]=0; usedDays[it.id]={}; wdSum[it.id]=0; wdDays[it.id]={}; });
+  T.daily.forEach(function(r){ const dt=r.move_date; if(dt<startStr||dt>todayStr) return; const id=r.item_id; if(!usedSum.hasOwnProperty(id)) return; const u=Number(r.used)||0; if(u>0){ usedSum[id]+=u; usedDays[id][dt]=1; } });
+  T.wd.forEach(function(r){ const dt=r.move_date; if(dt<startStr||dt>todayStr) return; const id=r.item_id; if(!wdSum.hasOwnProperty(id)) return; const q=Number(r.qty)||0; if(q>0){ wdSum[id]+=q; wdDays[id][dt]=1; } });
+  const suggestions={}, detail={};
+  items.forEach(function(it){
+    let base, nDays, src;
+    if(usedSum[it.id]>0){ base=usedSum[it.id]; nDays=Math.max(1,Object.keys(usedDays[it.id]).length); src='used'; }
+    else { base=wdSum[it.id]; nDays=Math.max(1,Object.keys(wdDays[it.id]).length); src='withdraw'; }
+    const avgDaily=base/nDays;
+    suggestions[it.id]=Math.ceil(avgDaily*bufferDays);
+    detail[it.id]={ avgDaily:Math.round(avgDaily*100)/100, src:src, nDays:nDays };
+  });
+  return { suggestions:suggestions, detail:detail, lookbackDays:lookbackDays, bufferDays:bufferDays };
+}
+ 
+async function sbGetStockAuditHistory(p){
+  const start = p && p.start, end = p && p.end;
+  const rows = await sbFetch('stock_audit?select=audit_date,branch,auditor,item_id,item_name,system_qty,actual_qty,diff,reason,adjusted,created_at');
+  const records = [];
+  rows.forEach(function(r){
+    if(!r.item_id) return;
+    const d = r.audit_date; if(start && d < start) return; if(end && d > end) return;
+    const ts = sbTsMs(r.created_at);
+    records.push({ date:d, dateDM:sbDM(d), time:sbFmtTime(r.created_at), session:d+'|'+ts,
+      staff:r.auditor||'-', id:r.item_id, name:r.item_name,
+      system:Number(r.system_qty)||0, actual:Number(r.actual_qty)||0, diff:Number(r.diff)||0,
+      reason:r.reason||'', adjusted:(r.adjusted===true) });
+  });
+  records.sort(function(a,b){ return a.session<b.session?1:(a.session>b.session?-1:0); });
+  return { records:records };
+}
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
@@ -504,7 +566,11 @@ const SB_ACTIONS = {
   getStockItems: sbGetStockItems,
   getStockDashboard: sbGetStockDashboard,
   getAttendStaff: sbGetAttendStaff,
-  getAttendReport: sbGetAttendReport
+  getAttendReport: sbGetAttendReport,
+  getConfig: sbGetConfig,
+  getDailyReport: sbGetDailyReport,
+  suggestMinStock: sbSuggestMinStock,
+  getStockAuditHistory: sbGetStockAuditHistory
 };
  
 async function api(action, params){
