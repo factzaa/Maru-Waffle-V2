@@ -556,6 +556,47 @@ async function sbGetStockAuditHistory(p){
   records.sort(function(a,b){ return a.session<b.session?1:(a.session>b.session?-1:0); });
   return { records:records };
 }
+
+// ---- เครื่องมือเขียน Supabase (insert + อัปรูปขึ้น Storage) ----
+function sbB64ToBlob(b64, mime){
+  const bin = atob(b64), len = bin.length, arr = new Uint8Array(len);
+  for(let i=0;i<len;i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime || 'image/jpeg' });
+}
+async function sbUploadImage(bucket, receipt){
+  if(!receipt || !receipt.base64) return '';
+  const isPng = String(receipt.mime||'').indexOf('png') >= 0;
+  const path = Date.now() + '_' + Math.random().toString(36).slice(2,8) + (isPng ? '.png' : '.jpg');
+  const res = await fetch(SB_URL + '/storage/v1/object/' + bucket + '/' + path, {
+    method:'POST',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, 'Content-Type': receipt.mime || 'image/jpeg' },
+    body: sbB64ToBlob(receipt.base64, receipt.mime)
+  });
+  if(!res.ok) throw new Error('อัปรูปไม่สำเร็จ (' + res.status + '): ' + (await res.text()).slice(0,150));
+  return SB_URL + '/storage/v1/object/public/' + bucket + '/' + path;   // ลิงก์รูปสาธารณะ
+}
+async function sbInsert(table, row){
+  const res = await fetch(SB_URL + '/rest/v1/' + table, {
+    method:'POST',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body: JSON.stringify(row)
+  });
+  if(res.ok) return { ok:true };
+  return { ok:false, error:'บันทึกไม่สำเร็จ (' + res.status + '): ' + (await res.text()).slice(0,150) };
+}
+ 
+async function sbAddBusinessExpense(p){
+  const data = (p && p.data) || {};
+  if(!data.date || !(Number(data.amount) > 0)) return { ok:false, error:'กรอกวันที่และยอดเงินให้ครบ' };
+  let url = data.existingUrl || '';
+  try{ if(data.receipt && data.receipt.base64) url = await sbUploadImage('receipts', data.receipt); }
+  catch(e){ return { ok:false, error: String(e.message || e) }; }
+  const row = { exp_date:data.date, item:data.item || '', amount:Number(data.amount) || 0,
+                receipt_url:url, type:'biz', created_at:new Date().toISOString() };
+  const res = await sbInsert('expenses', row);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึกค่าใช้จ่าย ✓', url:url };
+}
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
@@ -570,11 +611,12 @@ const SB_ACTIONS = {
   getConfig: sbGetConfig,
   getDailyReport: sbGetDailyReport,
   suggestMinStock: sbSuggestMinStock,
-  getStockAuditHistory: sbGetStockAuditHistory
+  getStockAuditHistory: sbGetStockAuditHistory,
+  addBusinessExpense: sbAddBusinessExpense
 };
  
 async function api(action, params){
-  if(SB_ACTIONS[action]){ return SB_ACTIONS[action](params || {}); }   // ← ดึงจาก Supabase
+  if(SB_ACTIONS[action]){ const _r = await SB_ACTIONS[action](params || {}); if(WRITE_INVALIDATES[action]) invalidateCache(WRITE_INVALIDATES[action]); return _r; }
   try{
     const res = await fetch(APPS_SCRIPT_URL, {
       method:'POST',
