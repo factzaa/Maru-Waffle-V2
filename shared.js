@@ -344,12 +344,87 @@ async function sbGetHomeDashboard(){
     activities:activities.slice(0,10)
   };
 }
+function sbDateTimeDM(v){
+  if(!v) return '';
+  const d = new Date(v); if(isNaN(d.getTime())) return '';
+  const p = function(n){ return ('0'+n).slice(-2); };
+  return p(d.getDate()) + '/' + p(d.getMonth()+1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
  
+async function sbGetExpensesReport(p){
+  const start = p.start || '0000-01-01', end = p.end || '9999-12-31', type = p.type || 'all';
+  const [expRows, salesRows] = await Promise.all([
+    sbFetch('expenses?select=exp_date,item,amount,receipt_url,type,created_at'),
+    sbFetch('sales?select=sale_date,total')
+  ]);
+  const items = []; let total = 0, posTotal = 0, bizTotal = 0, totalExpAll = 0;
+  expRows.forEach(function(r){
+    const d = r.exp_date; if(d < start || d > end) return;
+    const t = r.type || 'pos';
+    totalExpAll += Number(r.amount) || 0;
+    if(type !== 'all' && t !== type) return;
+    const amt = Number(r.amount) || 0;
+    items.push({ date:d, dateDM:sbDM(d), item:r.item || '', amount:amt, url:r.receipt_url || '', type:t, ts:sbDateTimeDM(r.created_at) });
+    total += amt; if(t === 'biz') bizTotal += amt; else posTotal += amt;
+  });
+  items.sort(function(a,b){ return b.date.localeCompare(a.date); });
+  let totalSales = 0, daysWithSales = 0;
+  salesRows.forEach(function(r){ const d = r.sale_date; if(d < start || d > end) return; const t = Number(r.total)||0; if(t > 0){ totalSales += t; daysWithSales++; } });
+  const sD = new Date(start+'T00:00:00'), eD = new Date(end+'T00:00:00');
+  const daysInRange = Math.max(1, Math.round((eD - sD)/86400000) + 1);
+  return { items:items,
+    summary:{ count:items.length, total:total, byType:{ pos:posTotal, biz:bizTotal } },
+    sales:{ total:totalSales, daysWithSales:daysWithSales, daysInRange:daysInRange, totalExpenseAll:totalExpAll } };
+}
+ 
+async function sbGetActivityFeed(p){
+  const start = p.start || sbFmtD(new Date()), end = p.end || start;
+  const inR = function(d){ return d >= start && d <= end; };
+  const [att, wd, rc, dl, exp, audit, sales] = await Promise.all([
+    sbFetch('attendance?select=att_date,att_time,type,name,in_geofence,distance'),
+    sbFetch('stock_withdraw?select=move_date,move_time,item_name,qty,recorded_by'),
+    sbFetch('stock_receive?select=move_date,item_name,qty,recorded_by,created_at'),
+    sbFetch('stock_daily?select=move_date,closed_by,created_at'),
+    sbFetch('expenses?select=exp_date,item,amount,type,created_at'),
+    sbFetch('stock_audit?select=audit_date,auditor,diff,created_at'),
+    sbFetch('sales?select=sale_date,total,created_at')
+  ]);
+  const A = [];
+  att.forEach(function(r){ if(!inR(r.att_date)) return; const d=r.att_date, tm=sbFmtTime(r.att_time);
+    A.push({ date:d, dateDM:sbDM(d), time:tm, type:r.type==='in'?'attend_in':'attend_out', icon:r.type==='in'?'🟢':'🔴',
+      title:r.name+' '+(r.type==='in'?'เช็คอิน':'เช็คเอาท์'),
+      detail:(r.in_geofence!==false?'✓ ในเขต':'⚠️ นอกเขต '+Math.round(Number(r.distance)||0)+'m'),
+      color:r.type==='in'?'#15803D':'#B91C1C', ts:d+' '+tm }); });
+  wd.forEach(function(r){ if(!inR(r.move_date)) return; const d=r.move_date, tm=sbFmtTime(r.move_time);
+    A.push({ date:d, dateDM:sbDM(d), time:tm, type:'withdraw', icon:'📤', title:'เบิก '+r.item_name+' x'+r.qty, detail:'โดย '+(r.recorded_by||'-'), color:'#C2410C', ts:d+' '+tm }); });
+  rc.forEach(function(r){ if(!inR(r.move_date)) return; const d=r.move_date, tm=sbFmtTime(r.created_at);
+    A.push({ date:d, dateDM:sbDM(d), time:tm, type:'receive', icon:'📥', title:'รับเข้า '+r.item_name+' x'+r.qty, detail:'โดย '+(r.recorded_by||'-'), color:'#15803D', ts:d+' '+(tm||'z') }); });
+  const closed = {};
+  dl.forEach(function(r){ if(!inR(r.move_date)) return; const d=r.move_date, key=d+'|'+(r.closed_by||''); if(closed[key]) return; closed[key]=true; const tm=sbFmtTime(r.created_at);
+    A.push({ date:d, dateDM:sbDM(d), time:tm, type:'close', icon:'🌙', title:'ปิดร้าน', detail:'โดย '+(r.closed_by||'-'), color:'#1E40AF', ts:d+' '+(tm||'y') }); });
+  const ab = {};
+  audit.forEach(function(r){ if(!inR(r.audit_date)) return; const d=r.audit_date, ts=sbTsMs(r.created_at), key=d+'|'+ts;
+    if(!ab[key]) ab[key]={ d:d, tsRaw:r.created_at, staff:(r.auditor||'-'), count:0, diff:0 }; ab[key].count++; if(Math.abs(Number(r.diff)||0)>0.01) ab[key].diff++; });
+  Object.keys(ab).forEach(function(k){ const b=ab[k], tm=sbFmtTime(b.tsRaw);
+    A.push({ date:b.d, dateDM:sbDM(b.d), time:tm, type:'audit', icon:'🔍',
+      title:'ออดิทสต๊อก'+(b.diff>0?' · ส่วนต่าง '+b.diff+' รายการ':' · ตรงทั้งหมด'),
+      detail:'โดย '+b.staff+' · ตรวจ '+b.count+' รายการ', color:'#7C3AED', ts:b.d+' '+(tm||'y') }); });
+  exp.forEach(function(r){ if(!inR(r.exp_date)) return; const d=r.exp_date, tm=sbFmtTime(r.created_at);
+    A.push({ date:d, dateDM:sbDM(d), time:tm, type:'expense', icon:'🧾',
+      title:'จ่าย '+(r.item||'-')+' ฿'+Math.round(Number(r.amount)||0).toLocaleString('en-US'),
+      detail:r.type==='biz'?'ค่าใช้จ่ายร้าน':'ค่าวัตถุดิบ', color:'#6D28D9', ts:d+' '+(tm||'z') }); });
+  sales.forEach(function(r){ if(!inR(r.sale_date)) return; const d=r.sale_date, tot=Number(r.total)||0; if(tot<=0) return; const tm=sbFmtTime(r.created_at);
+    A.push({ date:d, dateDM:sbDM(d), time:tm, type:'sales', icon:'💰', title:'บันทึกยอดขายวันนี้', detail:'฿'+Math.round(tot).toLocaleString('en-US'), color:'#15803D', ts:d+' '+(tm||'y') }); });
+  A.sort(function(a,b){ return b.ts.localeCompare(a.ts); });
+  return { range:{ start:start, end:end }, activities:A, count:A.length };
+} 
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
   getDashboardData: sbGetDashboardData,
-  getStockBalances: sbGetStockBalances
+  getStockBalances: sbGetStockBalances,
+  getExpensesReport: sbGetExpensesReport,
+  getActivityFeed: sbGetActivityFeed
 };
  
 async function api(action, params){
