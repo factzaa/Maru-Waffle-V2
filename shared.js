@@ -924,26 +924,27 @@ function bindSidebar(){
 function buildSidebar(currentPage){
   const items = [
     { page:'home',           href:'index.html',           icon:'dash',    label:'🏠 หน้าแรก' },
+    { group: '⭐ ทำประจำวัน' },
     { page:'report',         href:'records.html#report',  icon:'edit',    label:'บันทึกรายงานสิ้นวัน' },
     { page:'bizexp',         href:'records.html#bizexp',  icon:'receipt', label:'บันทึกค่าใช้จ่าย' },
-    { page:'dash',           href:'records.html#dash',    icon:'dash',    label:'แดชบอร์ดยอดขาย' },
-    { page:'expreport',      href:'expenses-report.html', icon:'trend',   label:'รายงานสรุปค่าใช้จ่าย' },
-    { group: '📦 สต๊อกสินค้า' },
-    { page:'stockDashboard', href:'stock-dashboard.html', icon:'dash',    label:'แดชบอร์ดสต๊อก' },
-    { page:'stockView',      href:'stock-view.html',      icon:'store',   label:'ตรวจสต๊อก' },
     { page:'stockWithdraw',  href:'stock-withdraw.html',  icon:'edit',    label:'เบิกของ' },
     { page:'stockReceive',   href:'stock-receive.html',   icon:'receipt', label:'รับของเข้า' },
-    { page:'stockClose',     href:'stock-close.html',     icon:'check',   label:'ปิดร้าน (สรุปสต๊อก)' },
-    { page:'stockAudit',     href:'stock-audit.html',     icon:'check',   label:'ออดิทสต๊อก' },
-    { page:'stockAuditReport', href:'stock-audit-report.html', icon:'trend', label:'ประวัติออดิท' },
-    { page:'stockManage',    href:'stock-manage.html',    icon:'edit',    label:'จัดการรายการ' },
-    { group: '⏰ เข้า-ออกงาน' },
     { page:'attend',         href:'attend.html',          icon:'check',   label:'บันทึกเข้างาน' },
+    { page:'stockClose',     href:'stock-close.html',     icon:'check',   label:'ปิดร้าน (สรุปสต๊อก)' },
+    { group: '📊 รายงาน' },
+    { page:'dash',           href:'records.html#dash',    icon:'dash',    label:'แดชบอร์ดยอดขาย' },
+    { page:'expreport',      href:'expenses-report.html', icon:'trend',   label:'รายงานสรุปค่าใช้จ่าย' },
+    { page:'stockDashboard', href:'stock-dashboard.html', icon:'dash',    label:'แดชบอร์ดสต๊อก' },
+    { page:'stockView',      href:'stock-view.html',      icon:'store',   label:'ตรวจสต๊อก' },
     { page:'attendReport',   href:'attend-report.html',   icon:'trend',   label:'รายงานเข้า-ออกงาน' },
+    { page:'stockAuditReport', href:'stock-audit-report.html', icon:'trend', label:'ประวัติออดิท' },
+    { group: '⚙️ จัดการ / ตั้งค่า' },
+    { page:'stockManage',    href:'stock-manage.html',    icon:'edit',    label:'จัดการรายการสต๊อก' },
+    { page:'stockAudit',     href:'stock-audit.html',     icon:'check',   label:'ออดิทสต๊อก' },
     { page:'attendSetup',    href:'attend-setup.html',    icon:'edit',    label:'จัดการพนักงาน/สาขา' },
     { page:'payments',       href:'payments.html',        icon:'receipt', label:'💰 การจ่ายเงิน' },
+    { group: '🐤 อื่นๆ' },
     { page:'assistant',      href:'assistant.html',       icon:'sparkles', label:'🐤 ผู้ช่วยมารุ' },
-    { group: '📖 คู่มือ' },
     { page:'manual',         href:'manual.html',          icon:'check',   label:'คู่มือการใช้งาน' },
   ];
   return items.map(function(it){
@@ -1041,9 +1042,12 @@ function maruAssistantMarkup(currentPage){
    + '<style id="maruStyle">'
    + '.maru-fab{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:60px;height:60px;border-radius:50%;'
    + 'border:0;background:transparent;color:#1A1A1A;font-size:30px;box-shadow:0 6px 18px rgba(0,0,0,.28);cursor:pointer;z-index:900;'
-   + 'display:flex;align-items:center;justify-content:center;transition:transform .15s;overflow:hidden;padding:0;}'
-   + '.maru-fab img{width:124%;height:124%;object-fit:cover;border-radius:50%;display:block;}'
+   + 'display:flex;align-items:center;justify-content:center;transition:transform .15s;overflow:hidden;padding:0;animation:maruPulse 2.8s ease-out infinite;}'
+   + '.maru-fab img{width:124%;height:124%;object-fit:cover;border-radius:50%;display:block;animation:maruBob 2.8s ease-in-out infinite;transform-origin:50% 92%;}'
    + '.maru-fab:active{transform:scale(.92);}'
+   + '@keyframes maruBob{0%,100%{transform:translateY(0) rotate(0);}20%{transform:translateY(-3px) rotate(-5deg);}40%{transform:translateY(0) rotate(0);}50%{transform:translateY(-2px) rotate(4deg);}62%{transform:translateY(0) rotate(0);}}'
+   + '@keyframes maruPulse{0%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 0 rgba(255,198,41,.45);}70%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 13px rgba(255,198,41,0);}100%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 0 rgba(255,198,41,0);}}'
+   + '@media (prefers-reduced-motion: reduce){.maru-fab,.maru-fab img{animation:none!important;}}'
    + '.maru-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1600;display:none;align-items:flex-end;justify-content:center;}'
    + '.maru-ov.show{display:flex;}'
    + '.maru-panel{background:#FAF8F1;width:100%;max-width:520px;height:78vh;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -6px 30px rgba(0,0,0,.25);}'
