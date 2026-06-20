@@ -1047,7 +1047,6 @@ function maruAssistantMarkup(currentPage){
    + '.maru-fab:active{transform:scale(.92);}'
    + '@keyframes maruBob{0%,100%{transform:translateY(0) rotate(0);}20%{transform:translateY(-3px) rotate(-5deg);}40%{transform:translateY(0) rotate(0);}50%{transform:translateY(-2px) rotate(4deg);}62%{transform:translateY(0) rotate(0);}}'
    + '@keyframes maruPulse{0%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 0 rgba(255,198,41,.45);}70%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 13px rgba(255,198,41,0);}100%{box-shadow:0 6px 18px rgba(0,0,0,.28),0 0 0 0 rgba(255,198,41,0);}}'
-   + '@media (prefers-reduced-motion: reduce){.maru-fab,.maru-fab img{animation:none!important;}}'
    + '.maru-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1600;display:none;align-items:flex-end;justify-content:center;}'
    + '.maru-ov.show{display:flex;}'
    + '.maru-panel{background:#FAF8F1;width:100%;max-width:520px;height:78vh;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -6px 30px rgba(0,0,0,.25);}'
