@@ -233,7 +233,45 @@
   function fmt(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
   function baht(n){return '฿'+Math.round(Number(n)||0).toLocaleString('en-US');}
 
+  // ===== Supabase (ย้ายจาก Apps Script) =====
+  const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
+  const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
+  async function sbFetch(path){
+    const r = await fetch(SB_URL + '/rest/v1/' + path, { headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY } });
+    if(!r.ok) throw new Error('Supabase ' + r.status + ': ' + (await r.text()).slice(0,150));
+    return r.json();
+  }
+  function sbDM(s){ const p = String(s).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+  function sbDateTimeDM(v){ if(!v) return ''; const d = new Date(v); if(isNaN(d.getTime())) return ''; const p = function(n){ return ('0'+n).slice(-2); }; return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+  async function sbGetExpensesReport(prm){
+    const start = prm.start || '0000-01-01', end = prm.end || '9999-12-31', type = prm.type || 'all';
+    const [expRows, salesRows] = await Promise.all([
+      sbFetch('expenses?select=exp_date,item,amount,receipt_url,type,created_at'),
+      sbFetch('sales?select=sale_date,total')
+    ]);
+    const items = []; let total = 0, posTotal = 0, bizTotal = 0, totalExpAll = 0;
+    expRows.forEach(function(r){
+      const d = r.exp_date; if(d < start || d > end) return;
+      const t = r.type || 'pos';
+      totalExpAll += Number(r.amount) || 0;
+      if(type !== 'all' && t !== type) return;
+      const amt = Number(r.amount) || 0;
+      items.push({ date:d, dateDM:sbDM(d), item:r.item || '', amount:amt, url:r.receipt_url || '', type:t, ts:sbDateTimeDM(r.created_at) });
+      total += amt; if(t === 'biz') bizTotal += amt; else posTotal += amt;
+    });
+    items.sort(function(a,b){ return b.date.localeCompare(a.date); });
+    let totalSales = 0, daysWithSales = 0;
+    salesRows.forEach(function(r){ const d = r.sale_date; if(d < start || d > end) return; const tt = Number(r.total)||0; if(tt > 0){ totalSales += tt; daysWithSales++; } });
+    const sD = new Date(start+'T00:00:00'), eD = new Date(end+'T00:00:00');
+    const daysInRange = Math.max(1, Math.round((eD - sD)/86400000) + 1);
+    return { items:items,
+      summary:{ count:items.length, total:total, byType:{ pos:posTotal, biz:bizTotal } },
+      sales:{ total:totalSales, daysWithSales:daysWithSales, daysInRange:daysInRange, totalExpenseAll:totalExpAll } };
+  }
+
   async function api(action, params){
+    if(action === 'getExpensesReport') return await sbGetExpensesReport(params || {});
+    // เผื่อ action อื่น (ปัจจุบันไม่มีการเรียก) — ยังคง fallback เดิมไว้
     const res = await fetch(APPS_SCRIPT_URL, {
       method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify(Object.assign({action:action},params||{}))
