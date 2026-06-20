@@ -104,10 +104,10 @@
   <div class="sheet">
 
     <div class="ranges" id="ranges">
-      <button class="rg on" data-r="today">วันนี้</button>
+      <button class="rg" data-r="today">วันนี้</button>
       <button class="rg" data-r="7">7 วัน</button>
       <button class="rg" data-r="30">30 วัน</button>
-      <button class="rg" data-r="month">เดือนนี้</button>
+      <button class="rg on" data-r="month">เดือนนี้</button>
     </div>
 
     <div class="datebar">
@@ -297,7 +297,7 @@ $('lbClose').addEventListener('click', function(){ $('lightbox').classList.remov
 $('lightbox').addEventListener('click', function(e){ if(e.target===$('lightbox')) $('lightbox').classList.remove('show'); });
 
 // init
-setRange('today');
+setRange('month');
 renderIcons();
 loadStaff();
 loadReport();
