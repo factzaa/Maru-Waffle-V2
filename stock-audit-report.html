@@ -76,9 +76,9 @@
 
     <div class="ranges" id="ranges">
       <button class="rg" data-r="today">วันนี้</button>
-      <button class="rg on" data-r="7">7 วัน</button>
+      <button class="rg" data-r="7">7 วัน</button>
       <button class="rg" data-r="30">30 วัน</button>
-      <button class="rg" data-r="month">เดือนนี้</button>
+      <button class="rg on" data-r="month">เดือนนี้</button>
     </div>
 
     <div class="datebar">
@@ -211,7 +211,7 @@ function render(){
   $('list').innerHTML = html;
 }
 
-setRange('7');
+setRange('month');
 load();
 </script>
 </body>
