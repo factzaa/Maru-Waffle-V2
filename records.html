@@ -36,7 +36,7 @@
 
   /* sheet */
   .sheet{background:var(--soft);border-radius:30px 30px 0 0;margin-top:-46px;
-    padding:18px 16px 60px;min-height:60vh;box-shadow:0 -6px 24px rgba(120,86,0,.12);position:relative;}
+    padding:15px 14px 56px;min-height:60vh;box-shadow:0 -6px 24px rgba(120,86,0,.12);position:relative;}
 
   /* tabs */
   .tabs{display:flex;gap:6px;background:#fff;padding:6px;border-radius:16px;
@@ -45,8 +45,8 @@
     color:var(--ink-2);padding:12px 6px;border-radius:11px;cursor:pointer;transition:.18s;}
   .tab.active{background:var(--ink);color:var(--yellow);}
 
-  .card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:0 4px 16px var(--shadow);margin-bottom:14px;}
-  .card .h{font-family:'Kanit';font-weight:700;font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:11px;letter-spacing:.2px;}
+  .card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:0 3px 12px var(--shadow);margin-bottom:11px;}
+  .card .h{font-family:'Kanit';font-weight:700;font-size:15.5px;margin-bottom:12px;display:flex;align-items:center;gap:10px;letter-spacing:.2px;}
   .card .h .ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:18px;color:#fff;flex:none;box-shadow:0 4px 10px rgba(26,26,26,.18);}
   .ic.store{background:linear-gradient(135deg,#FFB04A,#F37316);}
   .ic.deliv{background:linear-gradient(135deg,#3DD5DC,#1B98A4);}
@@ -141,8 +141,8 @@
   .ranges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
   .rg{border:1.5px solid var(--line);background:#fff;border-radius:11px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Sarabun';}
   .rg.on{background:var(--ink);color:var(--yellow);border-color:var(--ink);}
-  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:11px;margin-bottom:14px;}
-  .kpi{background:#fff;border-radius:16px;padding:15px;box-shadow:0 4px 14px var(--shadow);position:relative;overflow:hidden;}
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin-bottom:11px;}
+  .kpi{background:#fff;border-radius:14px;padding:13px;box-shadow:0 3px 11px var(--shadow);position:relative;overflow:hidden;}
   .kpi::after{content:'';position:absolute;right:-16px;top:-16px;width:56px;height:56px;border-radius:50%;background:rgba(255,198,41,.25);}
   .kpi .lbl{font-size:12px;color:var(--ink-2);font-weight:600;margin-bottom:5px;}
   .kpi .val{font-family:'Kanit';font-weight:700;font-size:21px;line-height:1.1;}
@@ -567,7 +567,8 @@
         <span style="font-weight:700;color:var(--ink-2);">ถึง</span>
         <input type="date" id="dEnd" style="background:#FFF7E0;color:var(--ink);">
       </div>
-      <button class="btn" id="loadDash" style="margin-bottom:16px;">ดูสรุปยอด</button>
+      <button class="btn" id="loadDash" style="margin-bottom:10px;">📊 ดูสรุปยอด (กราฟ)</button>
+      <button class="btn" id="loadTable" style="margin-bottom:16px;background:#fff;color:var(--ink);border:1.5px solid var(--line);">📋 ตารางรายวัน / Export CSV</button>
       <div id="dashBody"></div>
     </section>
 
@@ -1352,6 +1353,7 @@ const BRAND_LOGOS = {
     });
   });
   document.getElementById('loadDash').addEventListener('click',loadDashboard);
+  document.getElementById('loadTable').addEventListener('click',loadSalesTable);
 
   function loadDashboard(){
     const start=document.getElementById('dStart').value,end=document.getElementById('dEnd').value;
@@ -1361,6 +1363,52 @@ const BRAND_LOGOS = {
       .catch(function(e){ document.getElementById('dashBody').innerHTML='<div class="empty">โหลดไม่ได้: '+e.message+'</div>'; });
   }
 
+  function dlSalesCSV(rows,start,end){
+    var ch=[['cash','เงินสด'],['transfer','โอน'],['thaihelp','ไทยช่วยไทย'],['lineman','LineMan'],['grab','Grab'],['shopee','ShopeeFood'],['robinhood','Robinhood']];
+    var head=['วันที่','ยอดรวม'].concat(ch.map(function(c){return c[1];})).concat(['ส่วนต่างเงินสด']);
+    var lines=[head.join(',')];
+    rows.forEach(function(r){
+      var row=[r.sale_date, Number(r.total)||0].concat(ch.map(function(c){return Number(r[c[0]])||0;})).concat([Number(r.cash_diff)||0]);
+      lines.push(row.join(','));
+    });
+    var blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ยอดขาย_'+start+'_ถึง_'+end+'.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  }
+  async function loadSalesTable(){
+    var start=document.getElementById('dStart').value, end=document.getElementById('dEnd').value;
+    var body=document.getElementById('dashBody');
+    body.innerHTML='<div class="empty">กำลังโหลดตาราง...</div>';
+    try{
+      var rows=await sbFetch('sales?select=sale_date,total,cash,transfer,thaihelp,lineman,grab,shopee,robinhood,cash_diff&sale_date=gte.'+start+'&sale_date=lte.'+end+'&order=sale_date.desc');
+      if(!rows.length){ body.innerHTML='<div class="card"><div class="empty">ไม่มียอดขายในช่วงนี้</div></div>'; return; }
+      var totalSum=0; rows.forEach(function(r){ totalSum+=Number(r.total)||0; });
+      var h='<div class="card">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px;flex-wrap:wrap;">'
+        +'<div style="font-family:Kanit;font-weight:700;font-size:14.5px;">ยอดขายรายวัน · '+rows.length+' วัน · รวม '+baht(totalSum)+'</div>'
+        +'<button id="csvBtn" class="btn" style="width:auto;padding:8px 14px;font-size:13px;margin:0;">⬇️ CSV</button></div>'
+        +'<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table style="border-collapse:collapse;width:100%;font-size:13px;white-space:nowrap;">'
+        +'<thead><tr style="text-align:right;color:var(--ink-2);border-bottom:2px solid var(--line);">'
+        +'<th style="text-align:left;padding:7px 8px;">วันที่</th><th style="padding:7px 8px;">ยอดรวม</th><th style="padding:7px 8px;">สด</th><th style="padding:7px 8px;">โอน</th><th style="padding:7px 8px;">ไทยฯ</th><th style="padding:7px 8px;">Delivery</th><th style="padding:7px 8px;">ส่วนต่างสด</th></tr></thead><tbody>';
+      rows.forEach(function(r){
+        var deliv=(Number(r.lineman)||0)+(Number(r.grab)||0)+(Number(r.shopee)||0)+(Number(r.robinhood)||0);
+        var cd=Number(r.cash_diff)||0;
+        var cdTxt=cd===0?'-':((cd>0?'+':'')+baht(cd));
+        var cdColor=cd<0?'var(--red)':(cd>0?'var(--green)':'var(--ink-2)');
+        h+='<tr style="text-align:right;border-bottom:1px solid var(--line);">'
+          +'<td style="text-align:left;padding:7px 8px;font-weight:600;">'+thDate(r.sale_date)+'</td>'
+          +'<td style="padding:7px 8px;font-weight:700;">'+baht(r.total)+'</td>'
+          +'<td style="padding:7px 8px;">'+baht(r.cash)+'</td>'
+          +'<td style="padding:7px 8px;">'+baht(r.transfer)+'</td>'
+          +'<td style="padding:7px 8px;">'+baht(r.thaihelp)+'</td>'
+          +'<td style="padding:7px 8px;">'+baht(deliv)+'</td>'
+          +'<td style="padding:7px 8px;color:'+cdColor+';">'+cdTxt+'</td></tr>';
+      });
+      h+='</tbody></table></div></div>';
+      body.innerHTML=h;
+      document.getElementById('csvBtn').addEventListener('click',function(){ dlSalesCSV(rows,start,end); });
+    }catch(e){ body.innerHTML='<div class="empty">โหลดไม่ได้: '+escHtml(e.message)+'</div>'; }
+  }
   function renderDash(d){
     const s=d.summary;
     if(s.dayCount===0){document.getElementById('dashBody').innerHTML='<div class="card"><div class="empty">ยังไม่มีรายงานในช่วงนี้<br>ลองเลือกช่วงอื่น หรือบันทึกรายงานก่อน</div></div>';return;}
