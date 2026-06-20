@@ -557,10 +557,10 @@
     <!-- ===== Dashboard ===== -->
     <section id="tab-dash" class="hidden">
       <div class="ranges" id="ranges">
-        <button class="rg on" data-r="today">วันนี้</button>
+        <button class="rg" data-r="today">วันนี้</button>
         <button class="rg" data-r="7">7 วัน</button>
         <button class="rg" data-r="30">30 วัน</button>
-        <button class="rg" data-r="month">เดือนนี้</button>
+        <button class="rg on" data-r="month">เดือนนี้</button>
       </div>
       <div class="datebar" style="background:#fff;color:var(--ink);">
         <input type="date" id="dStart" style="background:#FFF7E0;color:var(--ink);">
@@ -1005,6 +1005,7 @@
   function initApp(cfg){
     CONFIG=cfg;
     ['rDate','dStart','dEnd','bizDate'].forEach(function(id){var el=document.getElementById(id); if(el) el.value=cfg.today;});
+    var _ds=document.getElementById('dStart'); if(_ds) _ds.value=cfg.today.substring(0,8)+'01';  // แดชบอร์ดยอดขาย default = เดือนนี้
     buildChannelRows();
     addExpenseItem();
     loadReportForDate(cfg.today);
