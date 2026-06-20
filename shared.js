@@ -631,7 +631,8 @@ async function sbAddStockWithdraw(p){
   if(!staff) return { ok:false, error:'กรุณากรอกชื่อผู้บันทึก' };
   if(!items.length) return { ok:false, error:'ยังไม่ได้เลือกรายการ' };
   const nm = sbNameMap(await sbItemsRaw()), today = sbLocalDate(), now = new Date().toISOString();
-  const rows = items.map(function(it){ return { move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff,
+  const tm = sbLocalTime();
+  const rows = items.map(function(it){ return { move_date:today, move_time:tm, branch:SB_STOCK_BRANCH, recorded_by:staff,
     item_id:it.id, item_name:nm[it.id]||'', qty:Number(it.amount)||0, note:null, created_at:now }; });
   const res = await sbInsert('stock_withdraw', rows);
   if(!res.ok) return res;
@@ -703,7 +704,7 @@ async function sbAddStockAudit(p){
     if(it.adjust && Math.abs(diff) > 0.001){
       const note = 'ปรับยอดจากออดิท' + (it.reason ? (' · ' + it.reason) : '');
       if(diff > 0) rcRows.push({ move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff, item_id:it.id, item_name:nm[it.id]||'', qty:diff, receipt_url:null, note:note, created_at:now });
-      else         wdRows.push({ move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff, item_id:it.id, item_name:nm[it.id]||'', qty:Math.abs(diff), note:note, created_at:now });
+      else         wdRows.push({ move_date:today, move_time:sbLocalTime(), branch:SB_STOCK_BRANCH, recorded_by:staff, item_id:it.id, item_name:nm[it.id]||'', qty:Math.abs(diff), note:note, created_at:now });
     }
   });
   const r1 = await sbInsert('stock_audit', auditRows);
