@@ -1012,7 +1012,7 @@ function injectShell(currentPage){
     +     '<button class="sb-close" id="sbClose">✕</button>'
     +   '</div>'
     +   '<nav class="sb-nav">' + buildSidebar(currentPage) + '</nav>'
-    +   '<div class="sb-foot">🐤 ข้อมูลเก็บใน Google Sheet ของคุณ</div>'
+    +   '<div class="sb-foot">🐤 ข้อมูลเก็บใน Supabase</div>'
     + '</aside>'
     // Receipt sheet (ใช้เมื่อแนบรูป)
     + '<div class="rcpt-sheet" id="rcptSheet"><div class="panel">'
