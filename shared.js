@@ -125,6 +125,8 @@ function apiSWR(action, params, onData){
 // ================= Supabase data layer (v2) =================
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
+const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -857,6 +859,18 @@ const SB_ACTIONS = {
  
 async function api(action, params){
   if(SB_ACTIONS[action]){ const _r = await SB_ACTIONS[action](params || {}); if(WRITE_INVALIDATES[action]) invalidateCache(WRITE_INVALIDATES[action]); return _r; }
+  if(EDGE_ACTIONS[action]){
+    const res = await fetch(EDGE_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:SB_KEY },   // publishable key ใส่ใน apikey เท่านั้น (ห้ามใส่ Authorization — จะโดน 401)
+      body:JSON.stringify(Object.assign({action:action}, params||{}))
+    });
+    if(!res.ok) throw new Error('Edge HTTP ' + res.status);
+    const data = await res.json();
+    if(data.error) throw new Error(data.error);
+    if(WRITE_INVALIDATES[action]) invalidateCache(WRITE_INVALIDATES[action]);
+    return data;
+  }
   try{
     const res = await fetch(APPS_SCRIPT_URL, {
       method:'POST',
