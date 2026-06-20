@@ -804,6 +804,27 @@ async function sbAddAttendLog(p){
   return { ok:true, msg:'บันทึก' + (d.type === 'out' ? 'ออกงาน' : 'เข้างาน') + 'แล้ว ✓', imgUrl:url, lineStatus:null };
 }
 
+
+// ---- สาขา (อ่าน/เขียน) — ย้ายจาก Apps Script ----
+async function sbGetAttendBranches(){
+  const rows = await sbFetch('branches?select=*');
+  const list = (rows || []).filter(function(r){ return r.branch_id && r.active !== false; }).map(function(r){
+    return { id:r.branch_id, name:r.name, address:r.address || '', lat:Number(r.lat) || 0, lng:Number(r.lng) || 0, radius:Number(r.radius) || 100 };
+  });
+  return { branches:list };
+}
+async function sbSaveAttendBranch(p){
+  const d = (p && p.data) || {};
+  if(!d.id || !d.name) return { ok:false, error:'ต้องระบุ ID และชื่อสาขา' };
+  const row = { branch_id:d.id, name:d.name, address:d.address || '', lat:Number(d.lat) || 0, lng:Number(d.lng) || 0, radius:Number(d.radius) || 100, active:(d.active !== false) };
+  const ex = await sbFetch('branches?select=branch_id&branch_id=eq.' + encodeURIComponent(d.id));
+  const res = (ex && ex.length)
+    ? await sbPatch('branches', 'branch_id=eq.' + encodeURIComponent(d.id), row)
+    : await sbInsert('branches', row);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึกสาขาแล้ว ✓' };
+}
+
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
@@ -829,7 +850,9 @@ const SB_ACTIONS = {
   addStockItem:      sbAddStockItem,
   deleteStockItem:   sbDeleteStockItem,
   saveMinStockBatch: sbSaveMinStockBatch,
-  addAttendLog:      sbAddAttendLog
+  addAttendLog:      sbAddAttendLog,
+  getAttendBranches: sbGetAttendBranches,
+  saveAttendBranch:  sbSaveAttendBranch
 };
  
 async function api(action, params){
