@@ -597,6 +597,212 @@ async function sbAddBusinessExpense(p){
   if(!res.ok) return res;
   return { ok:true, msg:'บันทึกค่าใช้จ่าย ✓', url:url };
 }
+// ========== เครื่องมือเขียนเพิ่ม: สต๊อก + เข้างาน (ย้ายจาก Apps Script) ==========
+const SB_STOCK_BRANCH = 'Pantip Ngamwongwan';                 // ร้านเดียว — ใช้ค่านี้กับทุกการบันทึกสต๊อก
+const SB_CAT_PREFIX   = { Waffle:'W', KUFF:'K', Drink:'D', Other:'O', Others:'O' };
+
+function sbLocalDate(){ return sbFmtD(new Date()); }
+function sbLocalTime(){ const d=new Date(); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2); }
+async function sbItemsRaw(){ return sbFetch('stock_items?select=*'); }
+function sbNameMap(rows){ const m={}; (rows||[]).forEach(function(r){ if(r.item_id) m[r.item_id]=r.name; }); return m; }
+
+// ---- PATCH/DELETE helper (PostgREST) ----
+async function sbPatch(table, query, row){
+  const res = await fetch(SB_URL + '/rest/v1/' + table + '?' + query, {
+    method:'PATCH',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, 'Content-Type':'application/json', Prefer:'return=minimal' },
+    body: JSON.stringify(row)
+  });
+  if(res.ok) return { ok:true };
+  return { ok:false, error:'อัปเดตไม่สำเร็จ (' + res.status + '): ' + (await res.text()).slice(0,150) };
+}
+async function sbDelete(table, query){
+  const res = await fetch(SB_URL + '/rest/v1/' + table + '?' + query, {
+    method:'DELETE',
+    headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, Prefer:'return=minimal' }
+  });
+  if(res.ok) return { ok:true };
+  return { ok:false, error:'ลบไม่สำเร็จ (' + res.status + '): ' + (await res.text()).slice(0,150) };
+}
+
+// ---- เบิกของ ----
+async function sbAddStockWithdraw(p){
+  const data = (p && p.data) || {}, staff = (data.staff||'').trim(), items = data.items || [];
+  if(!staff) return { ok:false, error:'กรุณากรอกชื่อผู้บันทึก' };
+  if(!items.length) return { ok:false, error:'ยังไม่ได้เลือกรายการ' };
+  const nm = sbNameMap(await sbItemsRaw()), today = sbLocalDate(), now = new Date().toISOString();
+  const rows = items.map(function(it){ return { move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff,
+    item_id:it.id, item_name:nm[it.id]||'', qty:Number(it.amount)||0, note:null, created_at:now }; });
+  const res = await sbInsert('stock_withdraw', rows);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึกเบิก ' + rows.length + ' รายการ ✓' };
+}
+
+// ---- รับเข้า (แนบบิลได้) ----
+async function sbAddStockReceive(p){
+  const data = (p && p.data) || {}, staff = (data.staff||'').trim(), items = data.items || [];
+  if(!staff) return { ok:false, error:'กรุณากรอกชื่อผู้บันทึก' };
+  if(!items.length) return { ok:false, error:'ยังไม่ได้เลือกรายการ' };
+  let url = '';
+  try{ if(data.receipt && data.receipt.base64) url = await sbUploadImage('receipts', data.receipt); }
+  catch(e){ return { ok:false, error:String(e.message || e) }; }
+  const nm = sbNameMap(await sbItemsRaw()), today = sbLocalDate(), now = new Date().toISOString();
+  const rows = items.map(function(it){ return { move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff,
+    item_id:it.id, item_name:nm[it.id]||'', qty:Number(it.amount)||0, receipt_url:url||null, note:null, created_at:now }; });
+  const res = await sbInsert('stock_receive', rows);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึกรับเข้า ' + rows.length + ' รายการ ✓', url:url };
+}
+
+// ---- ปิดรอบสต๊อกสิ้นวัน (สูตรตรงกับหน้า stock-close) ----
+async function sbCloseDailyStock(p){
+  const data = (p && p.data) || {}, staff = (data.staff||'').trim();
+  if(!staff) return { ok:false, error:'กรุณากรอกชื่อผู้ปิดรอบ' };
+  const wastes = data.wastes || {}, closings = data.closings || {};
+  const T = await sbStockTables();
+  const today = sbLocalDate(), now = new Date().toISOString();
+  const bal = sbComputeBalances(today, 'all', T);                 // ได้ prevClose/dayReceive/dayWithdraw ต่อรายการ
+  const nm = sbNameMap(T.items);
+  const rows = bal.items.filter(function(it){ return it.active !== false; }).map(function(it){
+    const open  = Number(it.prevClose) || 0;
+    const recv  = Number(it.dayReceive) || 0;
+    const used  = Number(it.dayWithdraw) || 0;                    // = withdraw_total
+    const waste = parseFloat(wastes[it.id]) || 0;
+    const autoClosing = Math.round((open + recv - used - waste) * 100) / 100;
+    const hasInput = (closings[it.id] !== undefined && closings[it.id] !== '');
+    const closeBal = hasInput ? (parseFloat(closings[it.id]) || 0) : autoClosing;
+    const actUse = Math.round((open + recv - closeBal - waste) * 100) / 100;   // ใช้จริงโดยนัย
+    const diff   = Math.round((actUse - used) * 100) / 100;
+    return { move_date:today, branch:SB_STOCK_BRANCH, closed_by:staff, item_id:it.id, item_name:nm[it.id]||it.name||'',
+      open_qty:open, receive_total:recv, withdraw_total:used, waste:waste, balance:closeBal, used:actUse, diff:diff,
+      mode:it.mode || 'withdraw', note:(data.note||'')||null, created_at:now };
+  });
+  if(!rows.length) return { ok:false, error:'ไม่มีรายการให้ปิดรอบ' };
+  const res = await sbInsert('stock_daily', rows);
+  if(!res.ok) return res;
+  return { ok:true, msg:'ปิดรอบแล้ว ' + rows.length + ' รายการ ✓ (LINE: รอ Edge Function)' };
+}
+
+// ---- ออดิทตรวจนับ + ปรับยอด ----
+async function sbAddStockAudit(p){
+  const data = (p && p.data) || {}, staff = (data.staff||'').trim(), items = data.items || [];
+  if(!staff) return { ok:false, error:'กรุณากรอกชื่อผู้ตรวจนับ' };
+  if(!items.length) return { ok:false, error:'ยังไม่ได้กรอกนับจริง' };
+  const T = await sbStockTables();
+  const today = sbLocalDate(), now = new Date().toISOString();
+  const balMap = {}; sbComputeBalances(today, 'all', T).items.forEach(function(x){ balMap[x.id] = x; });
+  const nm = sbNameMap(T.items);
+  const auditRows = [], wdRows = [], rcRows = [];
+  items.forEach(function(it){
+    const sys = balMap[it.id] ? Number(balMap[it.id].balance) || 0 : 0;
+    const act = Number(it.actualCount) || 0;
+    const diff = Math.round((act - sys) * 100) / 100;
+    auditRows.push({ audit_date:today, branch:SB_STOCK_BRANCH, auditor:staff, item_id:it.id, item_name:nm[it.id]||'',
+      system_qty:sys, actual_qty:act, diff:diff, reason:(it.reason||'')||null, adjusted:!!it.adjust, created_at:now });
+    // ปรับยอด: เขียน movement แก้ต่างให้คงเหลือเท่าที่นับจริง (sbComputeBalances อ่านจาก withdraw/receive)
+    if(it.adjust && Math.abs(diff) > 0.001){
+      const note = 'ปรับยอดจากออดิท' + (it.reason ? (' · ' + it.reason) : '');
+      if(diff > 0) rcRows.push({ move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff, item_id:it.id, item_name:nm[it.id]||'', qty:diff, receipt_url:null, note:note, created_at:now });
+      else         wdRows.push({ move_date:today, branch:SB_STOCK_BRANCH, recorded_by:staff, item_id:it.id, item_name:nm[it.id]||'', qty:Math.abs(diff), note:note, created_at:now });
+    }
+  });
+  const r1 = await sbInsert('stock_audit', auditRows);
+  if(!r1.ok) return r1;
+  if(rcRows.length){ const r = await sbInsert('stock_receive', rcRows); if(!r.ok) return r; }
+  if(wdRows.length){ const r = await sbInsert('stock_withdraw', wdRows); if(!r.ok) return r; }
+  const adj = rcRows.length + wdRows.length;
+  return { ok:true, msg:'บันทึกออดิท ' + auditRows.length + ' รายการ ✓' + (adj ? (' · ปรับยอด ' + adj) : '') };
+}
+
+// ---- แก้รายการสินค้า ----
+async function sbSaveStockItem(p){
+  const d = (p && p.data) || {};
+  if(!d.id) return { ok:false, error:'ไม่พบรหัสรายการ' };
+  const row = {};
+  if(d.name !== undefined) row.name = d.name;
+  if(d.category !== undefined) row.category = d.category;
+  if(d.unit !== undefined) row.unit = d.unit;
+  if(d.mode !== undefined) row.mode = d.mode;
+  if(d.minStock !== undefined) row.min_stock = Number(d.minStock) || 0;
+  if(d.active !== undefined) row.active = !!d.active;
+  row.edited_at = new Date().toISOString();
+  const res = await sbPatch('stock_items', 'item_id=eq.' + encodeURIComponent(d.id), row);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึกรายการแล้ว ✓' };
+}
+
+// ---- เพิ่มรายการสินค้าใหม่ (สร้าง item_id + sort_order อัตโนมัติ) ----
+async function sbAddStockItem(p){
+  const d = (p && p.data) || {};
+  if(!d.name) return { ok:false, error:'กรุณากรอกชื่อรายการ' };
+  const rows = await sbItemsRaw();
+  const prefix = SB_CAT_PREFIX[d.category] || (String(d.category||'X').match(/[A-Za-z]/) ? String(d.category).match(/[A-Za-z]/)[0].toUpperCase() : 'X');
+  let maxNum = 0, maxSort = 0;
+  rows.forEach(function(r){
+    if(r.item_id && r.item_id.indexOf(prefix) === 0){ const n = parseInt(String(r.item_id).slice(prefix.length), 10); if(!isNaN(n) && n > maxNum) maxNum = n; }
+    const s = Number(r.sort_order) || 0; if(s > maxSort) maxSort = s;
+  });
+  const newId = prefix + ('00' + (maxNum + 1)).slice(-3);
+  const row = { item_id:newId, name:d.name, category:d.category || 'Other', unit:d.unit || '',
+    min_stock:Number(d.minStock) || 0, sort_order:maxSort + 1, mode:d.mode || 'withdraw',
+    active:(d.active !== false), edited_at:new Date().toISOString() };
+  const res = await sbInsert('stock_items', row);
+  if(!res.ok) return res;
+  return { ok:true, msg:'เพิ่มรายการแล้ว ✓ (' + newId + ')', id:newId };
+}
+
+// ---- ลบรายการ: soft = ปิดใช้งาน, hard = ลบถาวร ----
+async function sbDeleteStockItem(p){
+  const id = p && p.id;
+  if(!id) return { ok:false, error:'ไม่พบรหัสรายการ' };
+  if(p.hard){
+    const res = await sbDelete('stock_items', 'item_id=eq.' + encodeURIComponent(id));
+    if(!res.ok) return res;
+    return { ok:true, msg:'ลบรายการถาวรแล้ว ✓' };
+  }
+  const res = await sbPatch('stock_items', 'item_id=eq.' + encodeURIComponent(id), { active:false, edited_at:new Date().toISOString() });
+  if(!res.ok) return res;
+  return { ok:true, msg:'ปิดใช้งานรายการแล้ว ✓' };
+}
+
+// ---- ตั้งค่าขั้นต่ำหลายรายการพร้อมกัน ----
+async function sbSaveMinStockBatch(p){
+  const items = (p && p.items) || [];
+  if(!items.length) return { ok:false, error:'ไม่มีรายการให้บันทึก' };
+  const now = new Date().toISOString();
+  let okN = 0;
+  for(let i = 0; i < items.length; i++){
+    const it = items[i]; if(!it.id) continue;
+    const res = await sbPatch('stock_items', 'item_id=eq.' + encodeURIComponent(it.id), { min_stock:Number(it.minStock) || 0, edited_at:now });
+    if(!res.ok) return { ok:false, error:'รายการ ' + it.id + ': ' + res.error };
+    okN++;
+  }
+  return { ok:true, msg:'บันทึกค่าขั้นต่ำ ' + okN + ' รายการ ✓' };
+}
+
+// ---- บันทึกเข้า/ออกงาน (อัปรูปขึ้น Storage bucket 'attendance') ----
+async function sbAddAttendLog(p){
+  const d = (p && p.data) || {};
+  if(!d.staffId) return { ok:false, error:'ไม่พบรหัสพนักงาน' };
+  // หา ชื่อ + สาขา จาก staff_safe
+  let name = '', branch = '';
+  try{
+    const s = await sbFetch('staff_safe?select=name,branch&staff_id=eq.' + encodeURIComponent(d.staffId) + '&limit=1');
+    if(s && s[0]){ name = s[0].name || ''; branch = s[0].branch || ''; }
+  }catch(e){}
+  let url = '';
+  try{ if(d.photo && d.photo.base64) url = await sbUploadImage('attendance', { base64:d.photo.base64, mime:d.photo.mime || 'image/jpeg' }); }
+  catch(e){ return { ok:false, error:'อัปรูปไม่สำเร็จ: ' + String(e.message || e) }; }
+  const row = { att_date:sbLocalDate(), att_time:sbLocalTime(), type:d.type || 'in',
+    staff_id:d.staffId, name:name, branch:branch,
+    lat:Number(d.lat) || 0, lng:Number(d.lng) || 0, address:d.address || '',
+    photo_url:url || null, in_geofence:(d.inGeofence !== false), distance:Number(d.distance) || 0,
+    note:d.note || null, created_at:new Date().toISOString() };
+  const res = await sbInsert('attendance', row);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึก' + (d.type === 'out' ? 'ออกงาน' : 'เข้างาน') + 'แล้ว ✓', imgUrl:url, lineStatus:null };
+}
+
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
@@ -612,7 +818,17 @@ const SB_ACTIONS = {
   getDailyReport: sbGetDailyReport,
   suggestMinStock: sbSuggestMinStock,
   getStockAuditHistory: sbGetStockAuditHistory,
-  addBusinessExpense: sbAddBusinessExpense
+  addBusinessExpense: sbAddBusinessExpense,
+  // ---- ฝั่งเขียนที่ย้ายมาใหม่ ----
+  addStockWithdraw:  sbAddStockWithdraw,
+  addStockReceive:   sbAddStockReceive,
+  closeDailyStock:   sbCloseDailyStock,
+  addStockAudit:     sbAddStockAudit,
+  saveStockItem:     sbSaveStockItem,
+  addStockItem:      sbAddStockItem,
+  deleteStockItem:   sbDeleteStockItem,
+  saveMinStockBatch: sbSaveMinStockBatch,
+  addAttendLog:      sbAddAttendLog
 };
  
 async function api(action, params){
