@@ -84,6 +84,39 @@ injectShell('payments');
 registerSW();
 const $ = function(id){return document.getElementById(id);};
 let payData = null;
+let ownerCode = '';
+
+function showGate(msg){
+  let g = document.getElementById('pwGate');
+  if(!g){
+    g = document.createElement('div');
+    g.id = 'pwGate';
+    g.style.cssText = 'position:fixed;inset:0;background:rgba(26,26,26,.96);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;';
+    g.innerHTML = '<div style="background:#fff;border-radius:18px;padding:26px 22px;max-width:340px;width:100%;text-align:center;box-sizing:border-box;">'
+      + '<div style="font-size:40px;">\uD83D\uDD12</div>'
+      + '<h3 style="font-family:Kanit;margin:8px 0 4px;color:#1A1A1A;">หน้าเงินเดือน</h3>'
+      + '<p style="color:#6B5F4A;font-size:13px;margin:0 0 16px;">ใส่รหัสเจ้าของเพื่อเข้าดู</p>'
+      + '<input id="pwInput" type="password" inputmode="numeric" maxlength="12" placeholder="รหัสเจ้าของ" style="width:100%;box-sizing:border-box;text-align:center;font-size:20px;letter-spacing:4px;padding:12px;border:1.5px solid #E5DFD2;border-radius:12px;font-family:Kanit;">'
+      + '<div id="pwErr" style="color:#D02C2C;font-size:13px;min-height:18px;margin-top:8px;"></div>'
+      + '<button id="pwBtn" style="width:100%;margin-top:6px;background:#1A1A1A;color:#FFC629;border:none;padding:13px;border-radius:12px;font-family:Kanit;font-weight:700;font-size:15px;cursor:pointer;">ปลดล็อก</button>'
+      + '</div>';
+    document.body.appendChild(g);
+    const submit = function(){
+      ownerCode = document.getElementById('pwInput').value.trim();
+      if(!ownerCode){ document.getElementById('pwErr').textContent = 'กรุณาใส่รหัส'; return; }
+      document.getElementById('pwErr').textContent = '';
+      document.getElementById('pwBtn').textContent = 'กำลังตรวจ...';
+      load();
+    };
+    document.getElementById('pwBtn').addEventListener('click', submit);
+    document.getElementById('pwInput').addEventListener('keydown', function(e){ if(e.key==='Enter') submit(); });
+  }
+  g.style.display = 'flex';
+  const btn = document.getElementById('pwBtn'); if(btn) btn.textContent = 'ปลดล็อก';
+  const er = document.getElementById('pwErr'); if(er) er.textContent = msg || '';
+  setTimeout(function(){ const i = document.getElementById('pwInput'); if(i){ i.value=''; i.focus(); } }, 50);
+}
+function hideGate(){ const g = document.getElementById('pwGate'); if(g) g.style.display = 'none'; }
 
 document.querySelectorAll('.tab2').forEach(function(b){
   b.addEventListener('click', function(){
@@ -98,12 +131,15 @@ document.querySelectorAll('.tab2').forEach(function(b){
 function av(s){ return escHtml((s.nickname||s.name||'?').charAt(0)); }
 
 async function load(){
+  if(!ownerCode){ showGate(); return; }
   $('paneP').innerHTML = '<div class="loading">กำลังโหลด...</div>';
   try{
-    payData = await api('getPayrollStatus', {});
+    payData = await api('getPayrollStatus', { ownerCode: ownerCode });
+    hideGate();
     render();
   }catch(err){
-    $('paneP').innerHTML = '<div class="empty"><div class="em">⚠️</div>โหลดไม่ได้: '+escHtml(err.message)+'</div>';
+    ownerCode = '';
+    showGate('รหัสไม่ถูกต้อง หรือโหลดไม่ได้');
   }
 }
 
@@ -190,7 +226,7 @@ async function payPT(id){
   if(!s) return;
   if(!confirm('บันทึกจ่าย '+(s.nickname||s.name)+' จำนวน '+s.daysToPay+' วัน'+(s.aloneDays>0?' (มาคนเดียว '+s.aloneDays+' วัน)':'')+' ?\nระบบจะนับวันใหม่ตั้งแต่พรุ่งนี้เป็นต้นไป')) return;
   try{
-    const r = await api('markPaid', { data: { staffId:id, type:'พาร์ทไทม์', days:s.daysToPay, aloneDays:s.aloneDays, periodStart:s.firstDay } });
+    const r = await api('markPaid', { data: { staffId:id, type:'พาร์ทไทม์', days:s.daysToPay, aloneDays:s.aloneDays, periodStart:s.firstDay }, ownerCode: ownerCode });
     toast(r.msg || 'บันทึกแล้ว ✓');
     load();
   }catch(err){ toast('ผิดพลาด: '+err.message); }
@@ -205,7 +241,7 @@ async function payFT(combo){
   if(!c) return;
   if(!confirm('บันทึกจ่าย '+(s.nickname||s.name)+'\n'+c.label+' ?')) return;
   try{
-    const r = await api('markPaid', { data: { staffId:sid, type:'ประจำ', cycleKey:cycleKey, periodStart:c.periodStart, periodEnd:c.periodEnd } });
+    const r = await api('markPaid', { data: { staffId:sid, type:'ประจำ', cycleKey:cycleKey, periodStart:c.periodStart, periodEnd:c.periodEnd }, ownerCode: ownerCode });
     toast(r.msg || 'บันทึกแล้ว ✓');
     load();
   }catch(err){ toast('ผิดพลาด: '+err.message); }
