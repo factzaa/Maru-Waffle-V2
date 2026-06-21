@@ -126,7 +126,7 @@ function apiSWR(action, params, onData){
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
 const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
-const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1 };
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -827,6 +827,55 @@ async function sbSaveAttendBranch(p){
   return { ok:true, msg:'บันทึกสาขาแล้ว ✓' };
 }
 
+// ===== มารุเฝ้าร้าน (getAlerts) — คำนวณจาก Supabase ทั้งหมด แทน Apps Script =====
+async function sbGetAlerts(){
+  var KPI_COST_RATIO_MAX = 30, KPI_DAILY_SALES_MIN = 3666.67;
+  var alerts = [], now = new Date(), today = sbFmtD(now), hh = now.getHours();
+  var hd = null; try{ hd = await api('getHomeDashboard', {}); }catch(e){}
+  if(hd){
+    if(hd.stock.outOfStock > 0){ var nm=(hd.stock.outOfStockItems||[]).map(function(x){return x.name;}).slice(0,5).join(', '); alerts.push({ id:'stock-out-'+today, level:'crit', icon:'🔴', title:'ของหมดสต๊อก '+hd.stock.outOfStock+' รายการ', msg:nm+(hd.stock.outOfStock>5?' และอื่นๆ':''), page:'stock-manage.html' }); }
+    if(hd.stock.lowStock > 0){ var lf=(hd.stock.criticalForecast||[]).map(function(x){return x.name;}).slice(0,5).join(', '); alerts.push({ id:'stock-low-'+today, level:'warn', icon:'🟡', title:'ของใกล้หมด '+hd.stock.lowStock+' รายการ', msg:lf||'ตรวจสอบและเตรียมสั่งเพิ่ม', page:'stock-manage.html' }); }
+    var ysd=hd.sales.yesterday||0, avg7=hd.sales.avg7||0;
+    if(avg7>0 && ysd===0) alerts.push({ id:'sales-zero-'+today, level:'crit', icon:'🔴', title:'เมื่อวานยอดขายเป็น 0', msg:'ตรวจสอบว่าบันทึกยอดครบหรือยัง', page:'index.html' });
+    else if(avg7>0 && ysd>0 && ysd<avg7*0.7) alerts.push({ id:'sales-low-'+today, level:'warn', icon:'🟡', title:'ยอดเมื่อวานตกผิดปกติ', msg:'เมื่อวาน '+Math.round(ysd)+' บาท ต่ำกว่าเฉลี่ย7วัน ('+Math.round(avg7)+') เกิน 30%', page:'index.html' });
+    if(hh>=10 && hd.attendance.checkedIn===0 && hd.attendance.total>0) alerts.push({ id:'attend-none-'+today, level:'warn', icon:'🟡', title:'ยังไม่มีใครเช็คอิน', msg:'เลย 10:00 แล้วยังไม่มีพนักงานเช็คอินวันนี้', page:'attend.html' });
+  }
+  try{ var ar=await api('getAttendReport',{start:today,end:today,type:'all'}); var outN={}; (ar.logs||[]).forEach(function(l){ if(l.type==='in'&&l.inGeofence===false) outN[l.staff||l.staffId]=1; }); var on=Object.keys(outN); if(on.length) alerts.push({ id:'attend-geo-'+today, level:'warn', icon:'🟡', title:'เช็คอินนอกพื้นที่', msg:on.join(', ')+' เช็คอินนอกพื้นที่ร้านวันนี้', page:'attend-report.html' }); }catch(e){}
+  try{
+    var mStart=today.substring(0,8)+'01'; var dd=await api('getDashboardData',{start:mStart,end:today});
+    if(dd&&dd.summary){ var su=dd.summary, sales=su.totalSales||0, exp=su.totalExpenses||0, avg=su.avgPerDay||0; var ratio=sales>0?exp/sales*100:0; var daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate(); var daysLeft=daysInMonth-now.getDate();
+      if(sales>0&&ratio>KPI_COST_RATIO_MAX) alerts.push({ id:'mgmt-cost-'+today, level:'crit', icon:'🔴', title:'ค่าใช้จ่ายเกินเป้า '+KPI_COST_RATIO_MAX+'%', msg:'เดือนนี้ค่าใช้จ่าย '+ratio.toFixed(1)+'% ของยอดขาย เสี่ยงหลุดอินเซนทีฟ', page:'expenses-report.html' });
+      if(avg>0&&avg<KPI_DAILY_SALES_MIN) alerts.push({ id:'mgmt-avg-'+today, level:'warn', icon:'🟡', title:'ยอดเฉลี่ยต่ำกว่าเป้า', msg:'เฉลี่ย '+Math.round(avg)+'/วัน (เป้า '+Math.round(KPI_DAILY_SALES_MIN)+') เหลือ '+daysLeft+' วัน ต้องเร่งยอด', page:'expenses-report.html' });
+      if(typeof su.cashDiff==='number'&&su.cashDiff<-1) alerts.push({ id:'cash-short-'+today, level:'warn', icon:'🟡', title:'เงินสดขาดสะสม', msg:'เดือนนี้เงินสดขาดรวม '+Math.round(Math.abs(su.cashDiff))+' บาท ตรวจสอบรายงานสิ้นวัน', page:'expenses-report.html' });
+    }
+  }catch(e){}
+  // เงินเดือน — แสดงเฉพาะเจ้าของที่ปลดล็อกแล้ว (กันพนักงานเห็น)
+  try{ var owner=''; try{ owner=sessionStorage.getItem('maruOwner')||''; }catch(e){}
+    if(owner){ var ps=await api('getPayrollStatus',{ownerCode:owner});
+      (ps.partTime||[]).forEach(function(sp){ if(sp.daysToPay>=7) alerts.push({ id:'pay-pt-'+sp.id+'-'+today, level:'warn', icon:'🟡', title:'ค้างจ่ายพาร์ทไทม์', msg:(sp.nickname||sp.name)+' ค้างจ่าย '+sp.daysToPay+' วัน', page:'payments.html' }); });
+      (ps.fullTime||[]).forEach(function(sf){ (sf.cycles||[]).forEach(function(c){ if(c.due&&!c.paid) alerts.push({ id:'pay-ft-'+sf.id+'-'+c.key, level:'warn', icon:'🟡', title:'ถึงกำหนดจ่ายประจำ', msg:(sf.nickname||sf.name)+' '+c.label+' ถึงกำหนดแล้ว', page:'payments.html' }); }); });
+    }
+  }catch(e){}
+  try{ var d60=sbFmtD(new Date(now.getTime()-60*86400000)); var ah=await api('getStockAuditHistory',{start:d60,end:today}); var recs=(ah&&ah.records)||[]; var lastA=recs.length?recs[0].date:null; var since=lastA?Math.floor((new Date(today+'T00:00:00')-new Date(lastA+'T00:00:00'))/86400000):999; if(since>=7) alerts.push({ id:'audit-old-'+today, level:'info', icon:'🔵', title:'ควรตรวจนับสต๊อก', msg:(lastA?'ตรวจนับล่าสุด '+sbDM(lastA)+' ('+since+' วันก่อน)':'ยังไม่เคยตรวจนับ')+' ควรตรวจนับเพื่อความแม่นยำ', page:'stock-audit.html' }); }catch(e){}
+  var order={crit:0,warn:1,info:2};
+  alerts.sort(function(a,b){ return (order[a.level]||9)-(order[b.level]||9); });
+  return { ok:true, alerts:alerts, count:alerts.length };
+}
+
+// ===== เช็คประวัติการใช้ของสินค้า (ก่อนลบ) — แทน Apps Script =====
+async function sbCheckStockItemUsage(p){
+  var id = p && p.id; if(!id) return { ok:false, error:'ต้องระบุ ID' };
+  var items = await sbFetch('stock_items?select=item_id,name,category,unit,active&item_id=eq.'+encodeURIComponent(id)+'&limit=1');
+  if(!items.length) return { ok:false, error:'ไม่พบ ID นี้' };
+  var it = items[0];
+  async function cnt(table){ try{ var r=await sbFetch(table+'?select=item_id&item_id=eq.'+encodeURIComponent(id)); return r.length; }catch(e){ return 0; } }
+  var res = await Promise.all([cnt('stock_withdraw'), cnt('stock_receive'), cnt('stock_daily'), cnt('stock_audit')]);
+  var wd=res[0], rc=res[1], dl=res[2], ad=res[3], total=wd+rc+dl+ad;
+  var balance=0; try{ var bal=await api('getStockBalances',{date:sbFmtD(new Date()),category:'all'}); if(bal&&bal.items){ var fnd=bal.items.find(function(x){return x.id===id;}); if(fnd) balance=Number(fnd.balance)||0; } }catch(e){}
+  return { ok:true, item:{ id:it.item_id, name:it.name, category:it.category, unit:it.unit, active:it.active!==false }, balance:balance,
+           usage:{ withdraw:wd, receive:rc, daily:dl, audit:ad, total:total }, canHardDelete: total===0 };
+}
+
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
@@ -854,7 +903,9 @@ const SB_ACTIONS = {
   saveMinStockBatch: sbSaveMinStockBatch,
   addAttendLog:      sbAddAttendLog,
   getAttendBranches: sbGetAttendBranches,
-  saveAttendBranch:  sbSaveAttendBranch
+  saveAttendBranch:  sbSaveAttendBranch,
+  getAlerts:         sbGetAlerts,
+  checkStockItemUsage: sbCheckStockItemUsage
 };
  
 async function api(action, params){
@@ -1269,84 +1320,154 @@ function maruFitFont(ctx, text, maxW, startPx, weight, family, minPx){
   while(px > minPx && ctx.measureText(text).width > maxW){ px -= 2; ctx.font = weight + ' ' + px + 'px ' + family; }
   return px;
 }
-function maruDrawPoster(imgEl, logoEl, W, H, poster){
-  var KANIT = 'Kanit, Sarabun, sans-serif', SARA = 'Sarabun, sans-serif';
-  var cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-  var ctx = cv.getContext('2d');
-  // วาดรูปแบบ cover เต็มพื้นที่
-  var ir = imgEl.width / imgEl.height, cr = W / H, dw, dh, dx, dy;
-  if(ir > cr){ dh = H; dw = H * ir; dx = (W - dw) / 2; dy = 0; }
-  else { dw = W; dh = W / ir; dx = 0; dy = (H - dh) / 2; }
-  ctx.drawImage(imgEl, dx, dy, dw, dh);
-  // ไล่เฉดมืดด้านล่างให้ตัวอักษรอ่านง่าย
-  var g = ctx.createLinearGradient(0, H * 0.4, 0, H);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.6, 'rgba(0,0,0,0.45)'); g.addColorStop(1, 'rgba(0,0,0,0.82)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-  var pad = Math.round(W * 0.06);
-  poster = poster || {};
-  var headline = String(poster.headline || '').trim();
-  var menu = String(poster.menu || '').trim();
-  var price = String(poster.price || '').trim();
-  var note = String(poster.note || '').trim();
-  // แบรนด์มุมบนซ้าย — ใช้โลโก้แบรนด์ (apple-touch-icon.png) เป็นสี่เหลี่ยมมุมมน
-  if(logoEl){
-    try{
-      var lw = Math.round(W * 0.20);
-      var lh = Math.round(lw * (logoEl.height / logoEl.width || 1));
-      var rr = Math.round(lw * 0.14);
-      ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = 12; ctx.shadowOffsetY = 3;
-      ctx.fillStyle = '#FFC629';
-      maruRoundRect(ctx, pad, pad, lw, lh, rr); ctx.fill();
-      ctx.restore();
-      ctx.save();
-      maruRoundRect(ctx, pad, pad, lw, lh, rr); ctx.clip();
-      ctx.drawImage(logoEl, pad, pad, lw, lh);
-      ctx.restore();
-    }catch(e){}
-  } else {
-    // สำรอง: ถ้าโหลดโลโก้ไม่ได้ เขียนชื่อร้านแทน
-    ctx.fillStyle = '#fff'; ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    ctx.font = '800 ' + Math.round(W * 0.05) + 'px ' + KANIT;
-    ctx.shadowColor = 'rgba(0,0,0,.55)'; ctx.shadowBlur = 8;
-    ctx.fillText('Maru Waffle', pad, pad + Math.round(W * 0.05));
-    ctx.shadowBlur = 0;
+// ===== โปสเตอร์ Canvas — หลายแพทเทิร์น (ผู้ใช้เลือกสไตล์เอง) =====
+var MARU_KANIT = 'Kanit, Sarabun, sans-serif', MARU_SARA = 'Sarabun, sans-serif';
+function maruCoverRegion(ctx, im, x, y, w, h){
+  var ir = im.width/im.height, cr = w/h, dw, dh, dx, dy;
+  if(ir > cr){ dh = h; dw = h*ir; dx = x+(w-dw)/2; dy = y; } else { dw = w; dh = w/ir; dx = x; dy = y+(h-dh)/2; }
+  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip(); ctx.drawImage(im,dx,dy,dw,dh); ctx.restore();
+}
+function maruBadge(ctx, logo, x, y, size, bg){
+  var rr = Math.round(size*0.18);
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,.3)'; ctx.shadowBlur=10; ctx.shadowOffsetY=2;
+  ctx.fillStyle = bg || '#FFC629'; maruRoundRect(ctx,x,y,size,size,rr); ctx.fill(); ctx.restore();
+  ctx.save(); maruRoundRect(ctx,x,y,size,size,rr); ctx.clip();
+  try{ ctx.drawImage(logo,x,y,size,size); }catch(e){} ctx.restore();
+}
+function maruPricePill(ctx, price, x, y, W){
+  ctx.font='800 '+Math.round(W*0.058)+'px '+MARU_KANIT;
+  var pw=ctx.measureText(price).width, ph=Math.round(W*0.135), pwid=pw+Math.round(W*0.10);
+  ctx.fillStyle='#E63329'; maruRoundRect(ctx,x-pwid,y,pwid,ph,ph/2); ctx.fill();
+  ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(price,x-pwid/2,y+ph/2); ctx.textAlign='left';
+  return { w:pwid, h:ph };
+}
+
+// (1) คลาสสิก — รูปเต็ม + เฉดดำล่าง
+function maruTpl_classic(ctx,W,H,im,logo,P){
+  maruCoverRegion(ctx,im,0,0,W,H);
+  var g=ctx.createLinearGradient(0,H*0.4,0,H); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(0.6,'rgba(0,0,0,.45)'); g.addColorStop(1,'rgba(0,0,0,.82)');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  var pad=Math.round(W*0.06);
+  if(logo) maruBadge(ctx,logo,pad,pad,Math.round(W*0.18));
+  if(P.price) maruPricePill(ctx,P.price,W-pad,pad,W);
+  var y=H-pad; ctx.textBaseline='alphabetic'; ctx.textAlign='left';
+  if(P.note){ ctx.font='500 '+Math.round(W*0.034)+'px '+MARU_SARA; ctx.fillStyle='#FFE7A3'; ctx.fillText(P.note,pad,y); y-=Math.round(W*0.058); }
+  if(P.menu){ var mp=maruFitFont(ctx,P.menu,W-pad*2,Math.round(W*0.052),'600',MARU_KANIT,24); ctx.font='600 '+mp+'px '+MARU_KANIT; ctx.fillStyle='#fff'; ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=8; ctx.fillText(P.menu,pad,y); ctx.shadowBlur=0; y-=Math.round(mp*1.2); }
+  if(P.headline){ var hp=maruFitFont(ctx,P.headline,W-pad*2,Math.round(W*0.12),'800',MARU_KANIT,36); ctx.font='800 '+hp+'px '+MARU_KANIT; ctx.fillStyle='#FFC629'; ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=12; ctx.fillText(P.headline,pad,y); ctx.shadowBlur=0; }
+}
+
+// (2) แถบบน — แถบดำด้านบน + ป้ายราคาวงกลม
+function maruTpl_topbar(ctx,W,H,im,logo,P){
+  maruCoverRegion(ctx,im,0,0,W,H);
+  var pad=Math.round(W*0.05), barH=Math.round(H*0.19);
+  ctx.fillStyle='#1A1A1A'; ctx.fillRect(0,0,W,barH);
+  var ls=Math.round(barH*0.6); if(logo) maruBadge(ctx,logo,pad,(barH-ls)/2,ls);
+  if(P.headline){ ctx.textAlign='right'; ctx.textBaseline='middle'; var hp=maruFitFont(ctx,P.headline,W-pad*2-ls-Math.round(W*0.03),Math.round(barH*0.46),'800',MARU_KANIT,26); ctx.font='800 '+hp+'px '+MARU_KANIT; ctx.fillStyle='#FFC629'; ctx.fillText(P.headline,W-pad,barH/2); ctx.textAlign='left'; }
+  var sH=Math.round(H*0.16), sy=H-sH; ctx.fillStyle='rgba(26,26,26,.72)'; ctx.fillRect(0,sy,W,sH);
+  ctx.textBaseline='middle';
+  if(P.menu){ var mp=maruFitFont(ctx,P.menu,W*0.62,Math.round(sH*0.34),'600',MARU_KANIT,22); ctx.font='600 '+mp+'px '+MARU_KANIT; ctx.fillStyle='#fff'; ctx.fillText(P.menu,pad,sy+sH*0.37); }
+  if(P.note){ ctx.font='500 '+Math.round(sH*0.21)+'px '+MARU_SARA; ctx.fillStyle='#FFE7A3'; ctx.fillText(P.note,pad,sy+sH*0.73); }
+  if(P.price){ var r=Math.round(W*0.12), cx=W-pad-r, cy=sy-r*0.15; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle='#E63329'; ctx.fill(); ctx.lineWidth=Math.round(r*0.08); ctx.strokeStyle='#fff'; ctx.stroke(); ctx.fillStyle='#fff'; ctx.textAlign='center'; var pp=maruFitFont(ctx,P.price,r*1.5,Math.round(r*0.62),'800',MARU_KANIT,18); ctx.font='800 '+pp+'px '+MARU_KANIT; ctx.fillText(P.price,cx,cy); ctx.textAlign='left'; }
+}
+
+// (3) แผงข้าง — รูปขวา + แผงเหลืองซ้าย
+function maruTpl_sidepanel(ctx,W,H,im,logo,P){
+  var pw=Math.round(W*0.44);
+  maruCoverRegion(ctx,im,pw,0,W-pw,H);
+  ctx.fillStyle='#FFC629'; ctx.fillRect(0,0,pw,H);
+  var pad=Math.round(W*0.045), iw=pw-pad*2;
+  var y=pad;
+  var ls=Math.round(pw*0.34); if(logo){ maruBadge(ctx,logo,pad,y,ls,'#1A1A1A'); } y+=ls+Math.round(H*0.04);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  if(P.headline){ var hp=maruFitFont(ctx,P.headline,iw,Math.round(W*0.075),'800',MARU_KANIT,30); ctx.font='800 '+hp+'px '+MARU_KANIT; ctx.fillStyle='#1A1A1A'; y+=hp; ctx.fillText(P.headline,pad,y); y+=Math.round(hp*0.5); }
+  if(P.menu){ var mp=maruFitFont(ctx,P.menu,iw,Math.round(W*0.042),'600',MARU_KANIT,20); ctx.font='600 '+mp+'px '+MARU_KANIT; ctx.fillStyle='#3A2E12'; y+=mp+Math.round(H*0.01); ctx.fillText(P.menu,pad,y); }
+  if(P.price){ var ph=Math.round(W*0.11), pwid=iw; y+=Math.round(H*0.03); ctx.fillStyle='#E63329'; maruRoundRect(ctx,pad,y,pwid,ph,ph*0.32); ctx.fill(); ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle'; var pp=maruFitFont(ctx,P.price,pwid*0.86,Math.round(ph*0.55),'800',MARU_KANIT,20); ctx.font='800 '+pp+'px '+MARU_KANIT; ctx.fillText(P.price,pad+pwid/2,y+ph/2); y+=ph; ctx.textAlign='left'; ctx.textBaseline='alphabetic'; }
+  if(P.note){ ctx.font='500 '+Math.round(W*0.03)+'px '+MARU_SARA; ctx.fillStyle='#5A4A1E'; y+=Math.round(H*0.04); ctx.fillText(P.note,pad,y); }
+}
+
+// (4) การ์ดกลาง — รูปเต็ม + การ์ดขาวโปร่งล่าง
+function maruTpl_card(ctx,W,H,im,logo,P){
+  maruCoverRegion(ctx,im,0,0,W,H);
+  var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'rgba(0,0,0,.15)'); g.addColorStop(1,'rgba(0,0,0,.35)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  var pad=Math.round(W*0.05);
+  if(logo) maruBadge(ctx,logo,pad,pad,Math.round(W*0.16));
+  var cw=Math.round(W*0.86), cx=(W-cw)/2;
+  var ch=Math.round(H*0.34), cy=H-ch-Math.round(H*0.06);
+  ctx.save(); ctx.shadowColor='rgba(0,0,0,.3)'; ctx.shadowBlur=24; ctx.shadowOffsetY=6; ctx.fillStyle='rgba(255,255,255,.94)'; maruRoundRect(ctx,cx,cy,cw,ch,Math.round(W*0.05)); ctx.fill(); ctx.restore();
+  var ix=cx+Math.round(cw*0.07), iw=cw-Math.round(cw*0.14), y=cy+Math.round(ch*0.06);
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  if(P.headline){ var hp=maruFitFont(ctx,P.headline,iw,Math.round(W*0.078),'800',MARU_KANIT,30); ctx.font='800 '+hp+'px '+MARU_KANIT; ctx.fillStyle='#1A1A1A'; y+=hp; ctx.fillText(P.headline,ix,y); y+=Math.round(hp*0.45); }
+  if(P.menu){ var mp=maruFitFont(ctx,P.menu,iw,Math.round(W*0.044),'600',MARU_KANIT,20); ctx.font='600 '+mp+'px '+MARU_KANIT; ctx.fillStyle='#444'; y+=mp+Math.round(H*0.008); ctx.fillText(P.menu,ix,y); }
+  if(P.note){ ctx.font='500 '+Math.round(W*0.03)+'px '+MARU_SARA; ctx.fillStyle='#888'; ctx.fillText(P.note,ix,cy+ch-Math.round(ch*0.10)); }
+  if(P.price){ ctx.font='800 '+Math.round(W*0.07)+'px '+MARU_KANIT; ctx.fillStyle='#E63329'; ctx.textAlign='right'; ctx.fillText(P.price,cx+cw-Math.round(cw*0.07),cy+ch-Math.round(ch*0.12)); ctx.textAlign='left'; }
+}
+
+// (5) โพลารอยด์ — กรอบรูป + พื้นครีม
+function maruTpl_polaroid(ctx,W,H,im,logo,P){
+  ctx.fillStyle='#FBF4E4'; ctx.fillRect(0,0,W,H);
+  // dots texture
+  ctx.fillStyle='rgba(255,198,41,.18)';
+  for(var gx=0;gx<W;gx+=Math.round(W*0.09)){ for(var gy=0;gy<H;gy+=Math.round(W*0.09)){ ctx.beginPath(); ctx.arc(gx,gy,Math.round(W*0.006),0,Math.PI*2); ctx.fill(); } }
+  var fw=Math.round(W*0.78), fx=(W-fw)/2, fy=Math.round(H*0.07), border=Math.round(fw*0.05);
+  var photoH=Math.round(fw*0.82);
+  ctx.save(); ctx.translate(W/2, fy+ (photoH+border*2)/2); ctx.rotate(-0.03); ctx.translate(-W/2, -(fy+(photoH+border*2)/2));
+  ctx.shadowColor='rgba(0,0,0,.22)'; ctx.shadowBlur=20; ctx.shadowOffsetY=8;
+  ctx.fillStyle='#fff'; ctx.fillRect(fx-border, fy-border, fw+border*2, photoH+border*3); ctx.shadowBlur=0;
+  maruCoverRegion(ctx,im,fx,fy,fw,photoH);
+  ctx.restore();
+  var y=fy+photoH+border*3+Math.round(H*0.05); var pad=Math.round(W*0.11);
+  ctx.textAlign='center'; ctx.textBaseline='alphabetic';
+  if(P.headline){ var hp=maruFitFont(ctx,P.headline,W-pad*2,Math.round(W*0.082),'800',MARU_KANIT,30); ctx.font='800 '+hp+'px '+MARU_KANIT; ctx.fillStyle='#1A1A1A'; y+=hp; ctx.fillText(P.headline,W/2,y); y+=Math.round(hp*0.5); }
+  if(P.menu){ var mp=maruFitFont(ctx,P.menu,W-pad*2,Math.round(W*0.044),'600',MARU_KANIT,20); ctx.font='600 '+mp+'px '+MARU_KANIT; ctx.fillStyle='#6B5836'; y+=mp; ctx.fillText(P.menu,W/2,y); y+=Math.round(mp*0.6); }
+  if(P.price){ ctx.font='800 '+Math.round(W*0.075)+'px '+MARU_KANIT; ctx.fillStyle='#E63329'; y+=Math.round(W*0.07); ctx.fillText(P.price,W/2,y); }
+  if(P.note){ ctx.font='500 '+Math.round(W*0.032)+'px '+MARU_SARA; ctx.fillStyle='#9A8A66'; ctx.fillText(P.note,W/2,H-Math.round(H*0.05)); }
+  if(logo) maruBadge(ctx,logo,W-Math.round(W*0.20),H-Math.round(W*0.20),Math.round(W*0.13));
+  ctx.textAlign='left';
+}
+
+// (6) ริบบิ้นทแยง — โปรช็อก
+function maruTpl_ribbon(ctx,W,H,im,logo,P){
+  maruCoverRegion(ctx,im,0,0,W,H);
+  var g=ctx.createLinearGradient(0,H*0.45,0,H); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,.8)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  var pad=Math.round(W*0.06);
+  if(logo) maruBadge(ctx,logo,pad,pad,Math.round(W*0.17));
+  // diagonal ribbon top-right
+  if(P.price || P.headline){
+    var rt = P.price || P.headline;
+    ctx.save(); ctx.translate(W,0); ctx.rotate(Math.PI/4);
+    var rw=Math.round(W*0.62), rh=Math.round(W*0.16);
+    ctx.shadowColor='rgba(0,0,0,.3)'; ctx.shadowBlur=12; ctx.fillStyle='#E63329'; ctx.fillRect(-rw/2, Math.round(W*0.04), rw, rh); ctx.shadowBlur=0;
+    ctx.fillStyle='#fff'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    var rp=maruFitFont(ctx,rt,rw*0.9,Math.round(rh*0.5),'800',MARU_KANIT,22); ctx.font='800 '+rp+'px '+MARU_KANIT;
+    ctx.fillText(rt, 0, Math.round(W*0.04)+rh/2); ctx.restore(); ctx.textAlign='left'; ctx.textBaseline='alphabetic';
   }
-  // ป้ายราคามุมบนขวา (สีแดงเด่น)
-  if(price){
-    ctx.font = '800 ' + Math.round(W * 0.058) + 'px ' + KANIT;
-    var pw = ctx.measureText(price).width;
-    var pillH = Math.round(W * 0.135), pillW = pw + Math.round(W * 0.10);
-    var px2 = W - pad - pillW, py2 = pad;
-    ctx.fillStyle = '#E63329';
-    maruRoundRect(ctx, px2, py2, pillW, pillH, pillH / 2); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(price, px2 + pillW / 2, py2 + pillH / 2);
-    ctx.textAlign = 'left';
-  }
-  // ข้อความล่าง: note (เล็กสุด) → menu → headline (ใหญ่สุด)
-  var y = H - pad;
-  ctx.textBaseline = 'alphabetic';
-  if(note){
-    ctx.font = '500 ' + Math.round(W * 0.034) + 'px ' + SARA;
-    ctx.fillStyle = '#FFE7A3'; ctx.fillText(note, pad, y);
-    y -= Math.round(W * 0.058);
-  }
-  if(menu){
-    var mp = maruFitFont(ctx, menu, W - pad * 2, Math.round(W * 0.052), '600', KANIT, 24);
-    ctx.font = '600 ' + mp + 'px ' + KANIT; ctx.fillStyle = '#fff';
-    ctx.shadowColor = 'rgba(0,0,0,.4)'; ctx.shadowBlur = 8;
-    ctx.fillText(menu, pad, y); ctx.shadowBlur = 0;
-    y -= Math.round(mp * 1.2);
-  }
-  if(headline){
-    var hp = maruFitFont(ctx, headline, W - pad * 2, Math.round(W * 0.12), '800', KANIT, 36);
-    ctx.font = '800 ' + hp + 'px ' + KANIT; ctx.fillStyle = '#FFC629';
-    ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 12;
-    ctx.fillText(headline, pad, y); ctx.shadowBlur = 0;
-  }
+  var y=H-pad;
+  if(P.note){ ctx.font='500 '+Math.round(W*0.034)+'px '+MARU_SARA; ctx.fillStyle='#FFD9D5'; ctx.fillText(P.note,pad,y); y-=Math.round(W*0.06); }
+  if(P.menu){ var mp=maruFitFont(ctx,P.menu,W-pad*2,Math.round(W*0.05),'600',MARU_KANIT,22); ctx.font='600 '+mp+'px '+MARU_KANIT; ctx.fillStyle='#fff'; ctx.shadowColor='rgba(0,0,0,.4)'; ctx.shadowBlur=8; ctx.fillText(P.menu,pad,y); ctx.shadowBlur=0; y-=Math.round(mp*1.2); }
+  if(P.headline){ var hp=maruFitFont(ctx,P.headline,W-pad*2,Math.round(W*0.11),'800',MARU_KANIT,34); ctx.font='800 '+hp+'px '+MARU_KANIT; ctx.fillStyle='#FFC629'; ctx.shadowColor='rgba(0,0,0,.45)'; ctx.shadowBlur=12; ctx.fillText(P.headline,pad,y); ctx.shadowBlur=0; }
+}
+
+var MARU_POSTER_STYLES = [
+  { id:'classic',   name:'คลาสสิก',   fn:maruTpl_classic },
+  { id:'topbar',    name:'แถบบน',     fn:maruTpl_topbar },
+  { id:'sidepanel', name:'แผงข้าง',   fn:maruTpl_sidepanel },
+  { id:'card',      name:'การ์ดกลาง', fn:maruTpl_card },
+  { id:'polaroid',  name:'โพลารอยด์', fn:maruTpl_polaroid },
+  { id:'ribbon',    name:'ริบบิ้นโปร', fn:maruTpl_ribbon }
+];
+function maruDrawPoster(imgEl, logoEl, W, H, poster, styleId){
+  var st = null; for(var i=0;i<MARU_POSTER_STYLES.length;i++){ if(MARU_POSTER_STYLES[i].id===styleId) st=MARU_POSTER_STYLES[i]; }
+  if(!st) st = MARU_POSTER_STYLES[0];
+  var cv=document.createElement('canvas'); cv.width=W; cv.height=H;
+  var ctx=cv.getContext('2d');
+  var P = poster || {};
+  P = { headline:String(P.headline||'').trim(), menu:String(P.menu||'').trim(), price:String(P.price||'').trim(), note:String(P.note||'').trim() };
+  ctx.fillStyle='#FBF4E4'; ctx.fillRect(0,0,W,H);
+  try{ st.fn(ctx, W, H, imgEl, logoEl, P); }catch(e){ try{ maruTpl_classic(ctx,W,H,imgEl,logoEl,P); }catch(_e){} }
   return cv.toDataURL('image/png');
 }
+
 
 // ===== สร้าง context ของร้านจาก Supabase ให้ผู้ช่วยมารุ (เฉพาะข้อมูลไม่ลับ — เงินเดือน/พนักงานทำที่ Edge) =====
 async function maruBuildContext(message){
@@ -1580,88 +1701,81 @@ function bindMaruAssistant(currentPage){
     wrap.appendChild(im); wrap.appendChild(pl); wrap.appendChild(a);
     msgs.appendChild(wrap); msgs.scrollTop = msgs.scrollHeight;
   }
-  function maruMakePosters(imgEl, poster, chans, isAi){
-    var tag = isAi ? ' · ภาพประกอบ AI' : '';
+  function maruRenderPosterStyle(imgEl, logo, poster, styleId, styleName, needSquare, needVert){
+    function build(){
+      if(needSquare){ try{ maruAddPoster(styleName + ' · 1:1', maruDrawPoster(imgEl, logo, 1080, 1080, poster, styleId)); }catch(e){} }
+      if(needVert){ try{ maruAddPoster(styleName + ' · 9:16', maruDrawPoster(imgEl, logo, 1080, 1920, poster, styleId)); }catch(e){} }
+    }
+    if(document.fonts && document.fonts.ready){ document.fonts.ready.then(build).catch(build); } else build();
+  }
+  function maruShowPosterPicker(imgEl, poster, chans, isAi){
     var needSquare = chans.length === 0 || chans.indexOf('facebook') >= 0 || chans.indexOf('line') >= 0 || chans.indexOf('instagram') >= 0;
     var needVert = chans.indexOf('tiktok') >= 0;
     if(!needSquare && !needVert) needSquare = true;
     maruEnsureLogo(function(logo){
-      function build(){
-        if(needSquare){ try{ maruAddPoster('จัตุรัส 1:1 (Facebook / Instagram / LINE)' + tag, maruDrawPoster(imgEl, logo, 1080, 1080, poster)); }catch(e){} }
-        if(needVert){ try{ maruAddPoster('แนวตั้ง 9:16 (TikTok / Story)' + tag, maruDrawPoster(imgEl, logo, 1080, 1920, poster)); }catch(e){} }
-      }
-      if(document.fonts && document.fonts.ready){ document.fonts.ready.then(build).catch(build); }
-      else build();
+      var wrap = document.createElement('div'); wrap.className = 'maru-cap';
+      var head = document.createElement('div'); head.className = 'maru-cap-h';
+      head.textContent = '🎨 เลือกสไตล์โปสเตอร์ (กดได้หลายแบบ)' + (isAi ? ' · ภาพแต่ง AI' : '');
+      wrap.appendChild(head);
+      var row = document.createElement('div'); row.style.cssText = 'display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;';
+      MARU_POSTER_STYLES.forEach(function(st){
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = st.name;
+        b.style.cssText = 'border:1.5px solid #ECE6D6;background:#fff;color:#1A1A1A;font-family:Kanit,sans-serif;font-weight:600;font-size:13px;padding:8px 13px;border-radius:10px;cursor:pointer;';
+        b.addEventListener('click', function(){ b.style.background = '#FFC629'; b.style.borderColor = '#FFC629'; maruRenderPosterStyle(imgEl, logo, poster, st.id, st.name, needSquare, needVert); });
+        row.appendChild(b);
+      });
+      wrap.appendChild(row);
+      var hi = msgs.querySelector('.maru-hi'); if(hi) hi.remove();
+      msgs.appendChild(wrap); msgs.scrollTop = msgs.scrollHeight;
     });
   }
   async function maruPromo(text){
     var chans = maruChannelsFrom(text);
-    var img = maruPromoImg;   // เก็บไว้ก่อนเคลียร์
+    var img = maruPromoImg;            // รูปที่แนบ (ถ้ามี)
     var wantAi = maruWantsAiImage(text);
-    var plain = maruWantsPlainImage(text);
-
-    // โหมดแต่งรูปเปล่า — ให้ AI แต่งรูปอย่างเดียว ไม่ใส่ข้อความ/แคปชั่น
-    if(wantAi && plain){
-      try{
-        var pl = { prompt: text };
-        if(img && img.dataURL){ pl.imageBase64 = img.dataURL.split(',')[1] || ''; pl.mime = (img.dataURL.match(/^data:(.*?);/) || [])[1] || 'image/jpeg'; }
-        var ip = await api('genPromoImage', pl);
-        maruNoDots();
-        if(ip && ip.ok && ip.image){
-          maruAdd('แต่งรูปให้แล้วครับ 🐤 (ภาพประกอบ AI ไม่ได้ใส่ข้อความ)','ai');
-          maruAddPoster('ภาพ AI (ไม่มีข้อความ)', ip.image);
-        } else {
-          maruAdd((ip && ip.error) || 'แต่งรูปไม่สำเร็จ ลองใหม่นะครับ','er');
-        }
-      }catch(e){ maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er'); }
-      clearAtt();
+    // แต่งรูปด้วย AI ได้เฉพาะ "จากรูปที่แนบ" เท่านั้น — ถ้าสั่งแต่งแต่ไม่มีรูป ให้เตือน (ไม่สร้างภาพขึ้นเอง)
+    if(wantAi && !(img && img.dataURL)){
+      maruNoDots();
+      maruAdd('แต่งรูปได้เฉพาะจากรูปที่แนบมานะครับ 🐤 แนบรูปสินค้าก่อน แล้วสั่ง "แต่งรูป" อีกครั้งได้เลย','er');
       return;
     }
     try{
+      // 1) แคปชั่น — ทำงานเสมอ แม้ไม่มีรูป (โหมดคิดแคปชั่นอย่างเดียว)
       var r = await api('genPromoCaption', { brief:text, channels:chans });
       maruNoDots();
       if(!(r.ok && r.captions)){ maruAdd(r.error || 'สร้างไม่สำเร็จ ลองใหม่นะครับ','er'); clearAtt(); return; }
-      maruAdd('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่น/ดาวน์โหลดรูปไปโพสต์ได้เลย','ai');
+      maruAdd('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่นไปโพสต์ได้เลย' + ((img && img.imgEl) ? ' · เลือกสไตล์โปสเตอร์ด้านล่างได้' : ''),'ai');
       var caps = r.captions;
       var order = (r.channels && r.channels.length) ? r.channels : Object.keys(caps);
       var shown = 0;
-      order.forEach(function(ch){
-        if(ch === 'poster' || ch === 'raw') return;
-        if(caps[ch]){ maruAddCaption(MARU_CHAN_LABEL[ch] || ch, String(caps[ch])); shown++; }
-      });
+      order.forEach(function(ch){ if(ch === 'poster' || ch === 'raw') return; if(caps[ch]){ maruAddCaption(MARU_CHAN_LABEL[ch] || ch, String(caps[ch])); shown++; } });
       if(!shown && caps.raw) maruAdd(String(caps.raw),'ai');
-      // เตรียมข้อความบนโปสเตอร์ — ถ้า AI ไม่ส่งข้อมูลโปร/ราคามา = ไม่แปะข้อความ ปล่อยภาพสะอาด (มีแค่โลโก้)
       var poster = caps.poster || {};
-      if(wantAi){
-        // เฟส 3: ให้ AI วาด/แต่งภาพ แล้วเอา Canvas ใส่ข้อความ/ราคา/โลโก้ทับ
-        maruAdd('🎨 กำลังวาดภาพด้วย AI สักครู่นะครับ (ใช้เวลานิดนึง)...','ai');
-        maruDots();
-        var payload = { prompt: text };
-        if(img && img.dataURL){
-          payload.imageBase64 = img.dataURL.split(',')[1] || '';
-          payload.mime = (img.dataURL.match(/^data:(.*?);/) || [])[1] || 'image/jpeg';
-        }
-        var ir;
-        try{ ir = await api('genPromoImage', payload); }catch(e){ ir = { ok:false, error:'เชื่อมต่อ AI ไม่ได้' }; }
-        maruNoDots();
-        if(ir && ir.ok && ir.image){
-          var aiImg = new Image();
-          aiImg.onload = function(){ maruMakePosters(aiImg, poster, chans, true); };
-          aiImg.onerror = function(){ maruAdd('โหลดภาพ AI ไม่ได้ ลองใหม่นะครับ','er'); if(img && img.imgEl) maruMakePosters(img.imgEl, poster, chans, false); };
-          aiImg.src = ir.image;
+      // 2) โปสเตอร์/แต่งรูป — เฉพาะเมื่อมีรูปแนบเท่านั้น
+      if(img && img.imgEl){
+        if(wantAi){
+          maruAdd('🎨 กำลังแต่งรูปจากภาพที่แนบด้วย AI สักครู่นะครับ...','ai'); maruDots();
+          var payload = { prompt:text, imageBase64:(img.dataURL.split(',')[1] || ''), mime:(img.dataURL.match(/^data:(.*?);/) || [])[1] || 'image/jpeg' };
+          var ir; try{ ir = await maruWithTimeout(api('genPromoImage', payload), 60000); }catch(e){ ir = { ok:false, error:'แต่งรูปนานเกินไป/เชื่อมต่อไม่ได้' }; }
+          maruNoDots();
+          if(ir && ir.ok && ir.image){
+            var aiImg = new Image();
+            aiImg.onload = function(){ maruAddPoster('ภาพแต่งด้วย AI (จากรูปที่แนบ)', ir.image); maruShowPosterPicker(aiImg, poster, chans, true); };
+            aiImg.onerror = function(){ maruAdd('โหลดภาพ AI ไม่ได้ ใช้รูปเดิมทำโปสเตอร์แทนนะครับ','er'); maruShowPosterPicker(img.imgEl, poster, chans, false); };
+            aiImg.src = ir.image;
+          } else {
+            maruAdd((ir && ir.error) || 'แต่งรูปไม่สำเร็จ ใช้รูปเดิมทำโปสเตอร์ได้','er');
+            maruShowPosterPicker(img.imgEl, poster, chans, false);
+          }
         } else {
-          maruAdd((ir && ir.error) || 'สร้างภาพ AI ไม่สำเร็จ','er');
-          if(img && img.imgEl) maruMakePosters(img.imgEl, poster, chans, false);   // สำรอง: ใช้รูปจริง
+          maruShowPosterPicker(img.imgEl, poster, chans, false);
         }
-      } else if(img && img.imgEl){
-        // เฟส 2: รูปจริง + ใส่ข้อความด้วย Canvas (หรือรูปเปล่าถ้าผู้ใช้ขอไม่ใส่ข้อความ)
-        if(plain){ maruAddPoster('รูปที่แนบ (ไม่ใส่ข้อความ)', img.dataURL); }
-        else { maruMakePosters(img.imgEl, poster, chans, false); }
       }
+      // ไม่มีรูปแนบ → แคปชั่นอย่างเดียว (ไม่ทำโปสเตอร์)
     }catch(e){
       maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er');
     }
-    clearAtt();   // เคลียร์รูปแนบหลังใช้
+    clearAtt();
   }
 
   function maruWithTimeout(p, ms){
