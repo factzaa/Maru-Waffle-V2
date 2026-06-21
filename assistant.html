@@ -92,7 +92,8 @@ $('chips').querySelectorAll('.chip').forEach(function(c){
 function addMsg(text, cls){
   const h=$('hello'); if(h) h.remove();
   const d=document.createElement('div');
-  d.className='msg '+cls; d.textContent=text;
+  d.className='msg '+cls;
+  if(cls==='ai' && window.maruRich){ d.innerHTML = window.maruRich(text); } else { d.textContent=text; }
   msgsEl.appendChild(d);
   msgsEl.scrollTop=msgsEl.scrollHeight;
   return d;
