@@ -46,10 +46,12 @@
 
 /* Quick Actions */
 .qa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
-.qa{background:#fff;border-radius:14px;padding:14px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;
+
+.qa{background:#fff;border-radius:17px;border:1px solid #F0E8D6;padding:14px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;
   cursor:pointer;text-decoration:none;color:inherit;border:0;transition:.15s;box-shadow:0 2px 6px rgba(0,0,0,.04);}
 .qa:active{transform:scale(.95);}
-.qa .ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;font-size:22px;}
+.qa .ic{width:48px;height:48px;display:grid;place-items:center;}
+.qa .ic img{width:100%;height:100%;object-fit:contain;}
 .qa .ic.green{background:linear-gradient(135deg,#86EFAC,#22C55E);}
 .qa .ic.yellow{background:linear-gradient(135deg,#FFC629,#F37316);}
 .qa .ic.blue{background:linear-gradient(135deg,#7DD3FC,#0284C7);}
@@ -58,7 +60,7 @@
 
 /* Stats Grid */
 .stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;}
-.stat-card{background:#fff;border-radius:13px;padding:12px 14px;}
+.stat-card{background:#fff;border-radius:17px;padding:13px 15px;border:1px solid #F0E8D6;box-shadow:0 3px 11px rgba(120,86,0,.05);}
 .stat-card .h{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);font-weight:600;}
 .stat-card .v{font-family:'Kanit';font-weight:800;font-size:22px;color:var(--ink);line-height:1.1;margin-top:4px;}
 .stat-card .v small{font-size:13px;color:var(--ink-2);font-weight:500;}
@@ -84,7 +86,8 @@
 .sec .h .more{margin-left:auto;font-size:11.5px;color:var(--teal);font-weight:600;text-decoration:none;}
 
 .dl-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
-.dl-grid a{background:#FFF7E0;padding:11px;border-radius:11px;text-decoration:none;color:var(--ink);font-family:'Kanit';font-weight:600;font-size:13px;text-align:center;}
+.dl-grid a{background:#fff;border:1px solid #F0E8D6;padding:11px 12px;border-radius:15px;text-decoration:none;color:var(--ink);font-family:'Kanit';font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:9px;box-shadow:0 2px 8px rgba(120,86,0,.05);}
+.dl-grid a img{width:28px;height:28px;object-fit:contain;flex:none;}
 
 .loading{text-align:center;padding:40px;color:var(--ink-2);font-size:13px;}
 .empty-mini{text-align:center;padding:14px;color:var(--ink-2);font-size:12.5px;}
@@ -173,10 +176,10 @@ function render(){
 
   // Quick Actions
   html += '<div class="qa-grid">'
-    +'<a class="qa" href="attend.html"><div class="ic green"><span>⏰</span></div><div class="lbl">เช็คอิน<br>เข้างาน</div></a>'
-    +'<a class="qa" href="records.html#report"><div class="ic yellow"><span>💰</span></div><div class="lbl">บันทึก<br>ยอดวันนี้</div></a>'
-    +'<a class="qa" href="stock-view.html"><div class="ic blue"><span>📦</span></div><div class="lbl">ตรวจ<br>สต๊อก</div></a>'
-    +'<a class="qa" href="stock-receive.html"><div class="ic purple"><span>📥</span></div><div class="lbl">รับ<br>ของเข้า</div></a>'
+    +'<a class="qa" href="attend.html"><div class="ic"><img src="ic-attend.png" alt=""></div><div class="lbl">เช็คอิน<br>เข้างาน</div></a>'
+    +'<a class="qa" href="records.html#report"><div class="ic"><img src="ic-record.png" alt=""></div><div class="lbl">บันทึก<br>ยอดวันนี้</div></a>'
+    +'<a class="qa" href="stock-view.html"><div class="ic"><img src="ic-audit.png" alt=""></div><div class="lbl">ตรวจ<br>สต๊อก</div></a>'
+    +'<a class="qa" href="stock-receive.html"><div class="ic"><img src="ic-receive.png" alt=""></div><div class="lbl">รับ<br>ของเข้า</div></a>'
   +'</div>';
 
   // Stats Grid
@@ -225,10 +228,10 @@ function render(){
   // ลิงก์แดชบอร์ดเต็ม
   html += '<div class="sec"><div class="h"><span class="em">📊</span> ดูข้อมูลเชิงลึก</div>'
     +'<div class="dl-grid">'
-      +'<a href="stock-dashboard.html">📦 แดชบอร์ดสต๊อก</a>'
-      +'<a href="records.html#dash">💰 แดชบอร์ดยอดขาย</a>'
-      +'<a href="attend-report.html">⏰ รายงานเข้า-ออก</a>'
-      +'<a href="expenses-report.html">🧾 รายงานค่าใช้จ่าย</a>'
+      +'<a href="records.html#dash"><img src="ic-sales.png" alt="">แดชบอร์ดยอดขาย</a>'
+      +'<a href="stock-dashboard.html"><img src="ic-overview.png" alt="">แดชบอร์ดสต๊อก</a>'
+      +'<a href="attend-report.html"><img src="ic-attendreport.png" alt="">รายงานเข้า-ออก</a>'
+      +'<a href="expenses-report.html"><img src="ic-expense.png" alt="">รายงานค่าใช้จ่าย</a>'
     +'</div>'
   +'</div>';
 
