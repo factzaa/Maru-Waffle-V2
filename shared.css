@@ -53,28 +53,28 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFFBF0;color:var(--in
 .sidebar-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;pointer-events:none;
   transition:opacity .3s;z-index:80;}
 .sidebar-backdrop.show{opacity:1;pointer-events:auto;}
-.sidebar{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:85vw;background:#1A1A1A;color:#fff;
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:280px;max-width:85vw;background:#FFFFFF;color:var(--ink);
   transform:translateX(-100%);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:90;
-  display:flex;flex-direction:column;box-shadow:6px 0 24px rgba(0,0,0,.3);}
+  display:flex;flex-direction:column;box-shadow:6px 0 28px rgba(0,0,0,.16);}
 .sidebar.show{transform:translateX(0);}
-.sb-head{padding:22px 22px 18px;border-bottom:1px solid #2A2620;display:flex;align-items:center;gap:12px;position:relative;}
+.sb-head{padding:20px 20px 18px;background:linear-gradient(180deg,#FFC629,#F5A800);display:flex;align-items:center;gap:12px;position:relative;}
 .sb-head img{width:46px;height:46px;border-radius:13px;flex:none;background:#fff;padding:2px;object-fit:contain;}
-.sb-head .sb-title{font-family:'Kanit';font-weight:700;font-size:17px;color:#FFC629;line-height:1.2;}
-.sb-head .sb-sub{font-size:11px;color:#9C8F7A;margin-top:2px;}
+.sb-head .sb-title{font-family:'Kanit';font-weight:700;font-size:17px;color:#3A2E00;line-height:1.2;}
+.sb-head .sb-sub{font-size:11px;color:#7A5E12;margin-top:2px;}
 .sb-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;border:0;
-  background:transparent;color:#D4CFC4;cursor:pointer;font-size:20px;display:grid;place-items:center;}
-.sb-close:hover{background:rgba(255,255,255,.08);color:#FFC629;}
+  background:rgba(255,255,255,.3);color:#3A2E00;cursor:pointer;font-size:20px;display:grid;place-items:center;}
+.sb-close:hover{background:rgba(255,255,255,.55);color:#1A1A1A;}
 .sb-nav{flex:1;padding:14px 10px;overflow-y:auto;}
 .sb-item{display:flex;align-items:center;gap:13px;padding:13px 14px;border-radius:12px;cursor:pointer;
-  color:#D4CFC4;transition:.15s;font-family:'Kanit';font-weight:500;font-size:14.5px;margin-bottom:3px;
+  color:var(--ink);transition:.15s;font-family:'Kanit';font-weight:600;font-size:14.5px;margin-bottom:3px;
   text-decoration:none;}
-.sb-item:hover{background:rgba(255,198,41,.08);color:#FFC629;}
-.sb-item.active{background:linear-gradient(135deg,rgba(255,198,41,.18),rgba(255,198,41,.06));color:#FFC629;}
+.sb-item:hover{background:#FFF7E0;color:var(--ink);}
+.sb-item.active{background:#FFF1CC;color:#1A1A1A;}
 .sb-item .si{width:22px;height:22px;flex:none;}
 .sb-item .si-img{width:30px;height:30px;object-fit:contain;flex:none;}
 .sb-item .si svg{width:22px;height:22px;}
-.sb-group{padding:18px 14px 6px;font-size:11px;color:#8A7F6A;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
-.sb-foot{padding:14px 22px 22px;border-top:1px solid #2A2620;font-size:11px;color:#6B5F4A;}
+.sb-group{padding:18px 14px 6px;font-size:11px;color:#A8997C;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
+.sb-foot{padding:14px 22px 22px;border-top:1px solid #F0E8D6;font-size:11px;color:#A8997C;}
 
 /* Receipt picker bottom sheet (สำหรับหน้ารับของ) */
 .rcpt-sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:65;padding:14px;}
