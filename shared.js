@@ -1023,35 +1023,35 @@ function bindSidebar(){
 // ---- Build standard sidebar (เรียกในทุกหน้า — มาร์ค active ตาม attr current) ----
 function buildSidebar(currentPage){
   const items = [
-    { page:'home',           href:'index.html',           icon:'dash',    label:'🏠 หน้าแรก' },
+    { page:'home',           href:'index.html',           img:'ic-overview.png',     label:'หน้าแรก' },
     { group: '⭐ ทำประจำวัน' },
-    { page:'report',         href:'records.html#report',  icon:'edit',    label:'บันทึกรายงานสิ้นวัน' },
-    { page:'bizexp',         href:'records.html#bizexp',  icon:'receipt', label:'บันทึกค่าใช้จ่าย' },
-    { page:'stockWithdraw',  href:'stock-withdraw.html',  icon:'edit',    label:'เบิกของ' },
-    { page:'stockReceive',   href:'stock-receive.html',   icon:'receipt', label:'รับของเข้า' },
-    { page:'attend',         href:'attend.html',          icon:'check',   label:'บันทึกเข้างาน' },
-    { page:'stockClose',     href:'stock-close.html',     icon:'check',   label:'ปิดร้าน (สรุปสต๊อก)' },
+    { page:'report',         href:'records.html#report',  img:'ic-record.png',       label:'บันทึกรายงานสิ้นวัน' },
+    { page:'bizexp',         href:'records.html#bizexp',  img:'ic-expense.png',      label:'บันทึกค่าใช้จ่าย' },
+    { page:'stockWithdraw',  href:'stock-withdraw.html',  img:'ic-overview.png',     label:'เบิกของ' },
+    { page:'stockReceive',   href:'stock-receive.html',   img:'ic-receive.png',      label:'รับของเข้า' },
+    { page:'attend',         href:'attend.html',          img:'ic-attend.png',       label:'บันทึกเข้างาน' },
+    { page:'stockClose',     href:'stock-close.html',     img:'ic-overview.png',     label:'ปิดร้าน (สรุปสต๊อก)' },
     { group: '📊 รายงาน' },
-    { page:'dash',           href:'records.html#dash',    icon:'dash',    label:'แดชบอร์ดยอดขาย' },
-    { page:'expreport',      href:'expenses-report.html', icon:'trend',   label:'รายงานสรุปค่าใช้จ่าย' },
-    { page:'stockDashboard', href:'stock-dashboard.html', icon:'dash',    label:'แดชบอร์ดสต๊อก' },
-    { page:'stockView',      href:'stock-view.html',      icon:'store',   label:'ตรวจสต๊อก' },
-    { page:'attendReport',   href:'attend-report.html',   icon:'trend',   label:'รายงานเข้า-ออกงาน' },
-    { page:'stockAuditReport', href:'stock-audit-report.html', icon:'trend', label:'ประวัติออดิท' },
+    { page:'dash',           href:'records.html#dash',    img:'ic-sales.png',        label:'แดชบอร์ดยอดขาย' },
+    { page:'expreport',      href:'expenses-report.html', img:'ic-expense.png',      label:'รายงานสรุปค่าใช้จ่าย' },
+    { page:'stockDashboard', href:'stock-dashboard.html', img:'ic-overview.png',     label:'แดชบอร์ดสต๊อก' },
+    { page:'stockView',      href:'stock-view.html',      img:'ic-audit.png',        label:'ตรวจสต๊อก' },
+    { page:'attendReport',   href:'attend-report.html',   img:'ic-attendreport.png', label:'รายงานเข้า-ออกงาน' },
+    { page:'stockAuditReport', href:'stock-audit-report.html', img:'ic-audit.png',   label:'ประวัติออดิท' },
     { group: '⚙️ จัดการ / ตั้งค่า' },
-    { page:'stockManage',    href:'stock-manage.html',    icon:'edit',    label:'จัดการรายการสต๊อก' },
-    { page:'stockAudit',     href:'stock-audit.html',     icon:'check',   label:'ออดิทสต๊อก' },
-    { page:'attendSetup',    href:'attend-setup.html',    icon:'edit',    label:'จัดการพนักงาน/สาขา' },
-    { page:'payments',       href:'payments.html',        icon:'receipt', label:'💰 การจ่ายเงิน' },
-    { page:'cashRemit',      href:'cash-remit.html',      icon:'check',   label:'💵 เงินสดนำส่ง' },
+    { page:'stockManage',    href:'stock-manage.html',    img:'ic-overview.png',     label:'จัดการรายการสต๊อก' },
+    { page:'stockAudit',     href:'stock-audit.html',     img:'ic-audit.png',        label:'ออดิทสต๊อก' },
+    { page:'attendSetup',    href:'attend-setup.html',    img:'ic-branch.png',       label:'จัดการพนักงาน/สาขา' },
+    { page:'payments',       href:'payments.html',        img:'ic-finance.png',      label:'การจ่ายเงิน' },
+    { page:'cashRemit',      href:'cash-remit.html',      img:'ic-finance.png',      label:'เงินสดนำส่ง' },
     { group: '🐤 อื่นๆ' },
-    { page:'assistant',      href:'assistant.html',       icon:'sparkles', label:'🐤 ผู้ช่วยมารุ' },
-    { page:'manual',         href:'manual.html',          icon:'check',   label:'คู่มือการใช้งาน' },
+    { page:'assistant',      href:'assistant.html',       img:'icon-faq.png',        label:'ผู้ช่วยมารุ' },
+    { page:'manual',         href:'manual.html',          img:'icon-contact.png',    label:'คู่มือการใช้งาน' },
   ];
   return items.map(function(it){
     if(it.group) return '<div class="sb-group">'+it.group+'</div>';
     const active = it.page === currentPage ? ' active' : '';
-    return '<a class="sb-item'+active+'" href="'+it.href+'"><span class="si" data-icon="'+it.icon+'"></span>'+it.label+'</a>';
+    return '<a class="sb-item'+active+'" href="'+it.href+'"><img class="si-img" src="'+it.img+'" alt="">'+it.label+'</a>';
   }).join('');
 }
 
@@ -1109,7 +1109,7 @@ function injectShell(currentPage){
     + '<div class="sidebar-backdrop" id="sbBackdrop"></div>'
     + '<aside class="sidebar" id="sidebar">'
     +   '<div class="sb-head">'
-    +     '<img src="icon-192.png" alt="">'
+    +     '<img src="Logo.png" alt="">'
     +     '<div><div class="sb-title">Maru Waffle</div><div class="sb-sub">ระบบบริหารร้าน</div></div>'
     +     '<button class="sb-close" id="sbClose">✕</button>'
     +   '</div>'
