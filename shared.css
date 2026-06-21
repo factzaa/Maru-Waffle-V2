@@ -21,7 +21,7 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFC629;color:var(--in
 .sheet{background:#FFFCEF;border-radius:24px 24px 0 0;min-height:calc(100vh - 200px);padding:18px 14px 30px;}
 
 /* Card */
-.card{background:#fff;border-radius:18px;padding:16px 16px 18px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+.card{background:#fff;border-radius:18px;padding:16px 16px 18px;margin-bottom:14px;border:1px solid #F0E8D6;box-shadow:0 3px 12px rgba(120,86,0,.06);}
 .card .h{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
 .card .h .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;flex:none;}
 .card .h .ic svg{width:18px;height:18px;color:#fff;}
@@ -58,7 +58,7 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFC629;color:var(--in
   display:flex;flex-direction:column;box-shadow:6px 0 24px rgba(0,0,0,.3);}
 .sidebar.show{transform:translateX(0);}
 .sb-head{padding:22px 22px 18px;border-bottom:1px solid #2A2620;display:flex;align-items:center;gap:12px;position:relative;}
-.sb-head img{width:42px;height:42px;border-radius:12px;flex:none;}
+.sb-head img{width:46px;height:46px;border-radius:13px;flex:none;background:#fff;padding:2px;object-fit:contain;}
 .sb-head .sb-title{font-family:'Kanit';font-weight:700;font-size:17px;color:#FFC629;line-height:1.2;}
 .sb-head .sb-sub{font-size:11px;color:#9C8F7A;margin-top:2px;}
 .sb-close{position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:8px;border:0;
@@ -71,6 +71,7 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFC629;color:var(--in
 .sb-item:hover{background:rgba(255,198,41,.08);color:#FFC629;}
 .sb-item.active{background:linear-gradient(135deg,rgba(255,198,41,.18),rgba(255,198,41,.06));color:#FFC629;}
 .sb-item .si{width:22px;height:22px;flex:none;}
+.sb-item .si-img{width:30px;height:30px;object-fit:contain;flex:none;}
 .sb-item .si svg{width:22px;height:22px;}
 .sb-group{padding:18px 14px 6px;font-size:11px;color:#8A7F6A;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
 .sb-foot{padding:14px 22px 22px;border-top:1px solid #2A2620;font-size:11px;color:#6B5F4A;}
