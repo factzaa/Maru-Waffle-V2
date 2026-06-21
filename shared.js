@@ -126,7 +126,7 @@ function apiSWR(action, params, onData){
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
 const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
-const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1 };
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -1348,6 +1348,77 @@ function maruDrawPoster(imgEl, logoEl, W, H, poster){
   return cv.toDataURL('image/png');
 }
 
+// ===== สร้าง context ของร้านจาก Supabase ให้ผู้ช่วยมารุ (เฉพาะข้อมูลไม่ลับ — เงินเดือน/พนักงานทำที่ Edge) =====
+async function maruBuildContext(message){
+  var m = String(message || '');
+  var t = {
+    sales:    /ยอด|ขาย|รายได้|กำไร|พยากรณ์|วิเคราะห์|แนวโน้ม|สรุป|เมื่อวาน|วันนี้|เดือนนี้|สัปดาห์|คาดการณ์|ประเมิน|ช่องทาง|เดลิเวอรี/i.test(m),
+    stock:    /สต๊อก|สต็อก|ของหมด|ใกล้หมด|วัตถุดิบ|สั่งของ|ของขาด|เตรียมของ|คงเหลือ/i.test(m),
+    stockDeep:/ของเสีย|ใช้เยอะ|เปลือง|เคลื่อนไหว|สิ้นเปลือง|ทิ้ง|waste|เบิกเยอะ/i.test(m),
+    attend:   /เข้างาน|ใครมา|มาทำงาน|ลงเวลา|ใครอยู่|ใครเข้า/i.test(m),
+    expense:  /ค่าใช้จ่าย|รายจ่าย|จ่ายค่า|ต้นทุน/i.test(m),
+    cash:     /เงินสด|เงินขาด|เงินเกิน|ส่วนต่างเงิน|ปิดยอด|รายงานสิ้นวัน|ปิดร้าน/i.test(m)
+  };
+  var any=false, kk; for(kk in t) if(t[kk]) any=true;
+  if(!any) return '';
+  var now=new Date(), today=sbFmtD(now);
+  var rangeDays=60;
+  if(/90 ?วัน|3 ?เดือน|ไตรมาส/i.test(m)) rangeDays=90;
+  else if(/7 ?วัน|สัปดาห์/i.test(m)) rangeDays=7;
+  else if(/30 ?วัน|1 ?เดือน|รายเดือน/i.test(m)) rangeDays=30;
+  var dStart=sbFmtD(new Date(now.getTime()-(rangeDays-1)*86400000)), rangeLabel=rangeDays+' วัน';
+  var p=[], hd=null;
+  if(t.sales||t.stock||t.attend||t.expense){ try{ hd=await api('getHomeDashboard',{}); }catch(e){} }
+  if(hd && t.sales){
+    p.push('ยอดขายเมื่อวาน '+Math.round(hd.sales.yesterday||0)+' บาท (เทียบเฉลี่ย7วัน '+(hd.sales.compareYesterdayPct>=0?'+':'')+hd.sales.compareYesterdayPct+'%), เฉลี่ย7วัน '+Math.round(hd.sales.avg7||0)+' บาท/วัน');
+    if(hd.sales.sales7days) p.push('ยอดขาย7วันล่าสุด: '+hd.sales.sales7days.map(function(x){return x.dateDM+'='+Math.round(x.sales);}).join(', '));
+  }
+  if(hd && t.stock){
+    p.push('สต๊อก: ทั้งหมด '+hd.stock.total+' รายการ · ใกล้หมด '+hd.stock.lowStock+' · หมด '+hd.stock.outOfStock);
+    if(hd.stock.outOfStockItems && hd.stock.outOfStockItems.length) p.push('ของหมด: '+hd.stock.outOfStockItems.map(function(x){return x.name;}).join(', '));
+    if(hd.stock.criticalForecast && hd.stock.criticalForecast.length) p.push('ใกล้หมดใน~3วัน: '+hd.stock.criticalForecast.map(function(x){return x.name+'(เหลือ~'+x.daysLeft+'วัน)';}).join(', '));
+    var buffer=3, recos=[];
+    (hd.stock.criticalForecast||[]).forEach(function(x){ var order=Math.max(0,Math.ceil((x.avgDaily||0)*buffer)-(x.balance||0)); if(order>0) recos.push(x.name+' สั่งเพิ่ม ~'+order+(x.unit?' '+x.unit:'')+' (ใช้~'+x.avgDaily+'/วัน เหลือ~'+x.daysLeft+'วัน)'); });
+    try{ var sm=await api('suggestMinStock',{lookbackDays:7,bufferDays:buffer}); (hd.stock.outOfStockItems||[]).forEach(function(o){ var det=sm.detail&&sm.detail[o.id], avg=det?det.avgDaily:0; var order=(sm.suggestions&&sm.suggestions[o.id])||(avg?Math.ceil(avg*buffer):0); recos.push(o.name+' (หมดแล้ว) สั่ง ~'+(order||'-')+(o.unit?' '+o.unit:'')+(avg?' (ใช้~'+avg+'/วัน)':'')); }); }catch(e){}
+    if(recos.length) p.push('คำแนะนำปริมาณสั่ง (~'+buffer+' วัน): '+recos.join('; '));
+  }
+  if(hd && t.attend){
+    p.push('เข้างานวันนี้: เข้า '+hd.attendance.checkedIn+'/'+hd.attendance.total+' คน · ออกแล้ว '+hd.attendance.checkedOut+' · กำลังอยู่ '+hd.attendance.present.length);
+    if(hd.attendance.present && hd.attendance.present.length) p.push('คนที่กำลังอยู่: '+hd.attendance.present.map(function(x){return x.name;}).join(', '));
+  }
+  if(t.expense){
+    try{
+      var s7=sbFmtD(new Date(now.getTime()-6*86400000));
+      var er7=await api('getExpensesReport',{start:s7,end:today,type:'all'});
+      p.push('ค่าใช้จ่าย 7 วันล่าสุด รวม '+Math.round((er7.summary&&er7.summary.total)||0)+' บาท');
+      if(er7.items && er7.items.length) p.push('รายการค่าใช้จ่ายล่าสุด: '+er7.items.slice(0,15).map(function(x){return x.dateDM+' '+x.item+' '+Math.round(x.amount)+'บ.';}).join(', '));
+      var mS=today.substring(0,8)+'01';
+      var erM=await api('getExpensesReport',{start:mS,end:today,type:'all'});
+      p.push('ค่าใช้จ่ายเดือนนี้ รวม '+Math.round((erM.summary&&erM.summary.total)||0)+' บาท');
+    }catch(e){}
+  }
+  if((t.sales && /พยากรณ์|วิเคราะห์|แนวโน้ม|เดือน|คาดการณ์|ประเมิน|ช่องทาง|กำไร|สรุป|เดลิเวอรี|วันไหนขาย|รายวัน|เฉลี่ย/i.test(m)) || t.cash){
+    try{
+      var dd=await api('getDashboardData',{start:dStart,end:today});
+      if(dd && dd.summary){ var su=dd.summary;
+        p.push('สรุป '+rangeLabel+' ('+sbDM(dStart)+'–'+sbDM(today)+'): ยอดรวม '+Math.round(su.totalSales)+' · เฉลี่ย '+Math.round(su.avgPerDay)+'/วัน · เปิด '+su.dayCount+' วัน · กำไรสุทธิ '+Math.round(su.netProfit)+' (ค่าใช้จ่าย '+Math.round(su.totalExpenses)+')'+(su.growth!=null?' · เทียบช่วงก่อน '+(su.growth>=0?'+':'')+Math.round(su.growth)+'%':'')+(su.bestDow?' · วันขายดีสุด '+su.bestDow:''));
+        if(dd.byChannel && dd.byChannel.length) p.push('แยกช่องทาง: '+dd.byChannel.map(function(c){return c.label+' '+Math.round(c.total);}).join(', '));
+        if(typeof su.cashDiff==='number' && su.cashDiff!==0) p.push('ส่วนต่างเงินสดสะสม '+rangeLabel+': '+(su.cashDiff>0?'เกิน ':'ขาด ')+Math.round(Math.abs(su.cashDiff))+' บาท');
+        if(dd.byDay && dd.byDay.length) p.push('ยอดรายวัน(21วันล่าสุด): '+dd.byDay.slice(-21).map(function(o){return sbDM(o.date)+'='+Math.round(o.total);}).join(', '));
+      }
+    }catch(e){}
+  }
+  if(t.stockDeep){
+    try{ var sd=await api('getStockDashboard',{start:dStart,end:today});
+      if(sd && sd.summary) p.push('สต๊อกเชิงลึก '+rangeLabel+': เบิกรวม '+sd.summary.totalWdQty+' · ของเสียรวม '+sd.summary.totalWasted);
+      if(sd && sd.topWasted && sd.topWasted.length) p.push('ของเสียเยอะสุด: '+sd.topWasted.slice(0,5).map(function(x){return x.name+' '+x.wasted+(x.unit||'');}).join(', '));
+      if(sd && sd.topWithdrawn && sd.topWithdrawn.length) p.push('เบิกเยอะสุด: '+sd.topWithdrawn.slice(0,5).map(function(x){return x.name+' '+x.wdQty+(x.unit||'');}).join(', '));
+    }catch(e){}
+  }
+  return p.length ? ('ข้อมูลจริงของร้าน (วันนี้ '+today+'):\n- '+p.join('\n- ')) : '';
+}
+window.maruBuildContext = maruBuildContext;
+
 function bindMaruAssistant(currentPage){
   if(currentPage === 'assistant') return;
   var fab = document.getElementById('maruFab');
@@ -1593,25 +1664,44 @@ function bindMaruAssistant(currentPage){
     clearAtt();   // เคลียร์รูปแนบหลังใช้
   }
 
+  function maruWithTimeout(p, ms){
+    return new Promise(function(resolve, reject){
+      var to = setTimeout(function(){ reject(new Error('__timeout__')); }, ms);
+      Promise.resolve(p).then(function(v){ clearTimeout(to); resolve(v); }, function(e){ clearTimeout(to); reject(e); });
+    });
+  }
+
   window.maruSend = async function(forceText){
     var text = (typeof forceText === 'string') ? forceText : inp.value.trim();
     if(!text || maruBusy) return;
     maruBusy=true; sendB.disabled=true;
+    var handedOff=false;
     if(typeof forceText !== 'string'){ maruAdd(text,'me'); inp.value=''; inp.style.height='auto'; }
     maruDots();
-    if(maruIsPromo(text) || maruPromoImg || maruWantsAiImage(text)){ await maruPromo(text); maruBusy=false; sendB.disabled=false; return; }
     try{
+      if(maruIsPromo(text) || maruPromoImg || maruWantsAiImage(text)){ await maruPromo(text); return; }
       var owner = '';
       try{ owner = sessionStorage.getItem('maruOwner') || ''; }catch(e){}
-      var r = await api('askAI', { message:text, history:maruHistory, ownerCode:owner });
+      // เรียก AI: มี timeout 45 วิ + ลองซ้ำอัตโนมัติ 1 ครั้ง (กัน server cold start / เน็ตสะดุด)
+      var maruCtx = '';
+      try{ maruCtx = await maruBuildContext(text); }catch(e){}
+      var r = null, lastErr = null;
+      for(var attempt=0; attempt<2; attempt++){
+        try{ r = await maruWithTimeout(api('askAI', { message:text, history:maruHistory, context:maruCtx, ownerCode:owner }), 45000); lastErr=null; break; }
+        catch(e){ lastErr=e; if(attempt===0){ await new Promise(function(res){ setTimeout(res,800); }); } }
+      }
       maruNoDots();
+      if(lastErr){
+        maruAdd((lastErr && lastErr.message==='__timeout__') ? 'มารุคิดนานไปหน่อย ลองถามใหม่อีกครั้งนะครับ 🐤' : 'เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er');
+        return;
+      }
       if(r.ok && r.needOwner){
         maruAdd(r.reply,'ai');
         var code = prompt('🔒 ใส่รหัสเจ้าของ เพื่อดูข้อมูลค่าจ้าง/เงินเดือน');
         if(code){
           try{ sessionStorage.setItem('maruOwner', code); }catch(e){}
-          maruBusy=false; sendB.disabled=false;
-          return window.maruSend(text);   // ถามซ้ำพร้อมรหัส (ไม่เพิ่มข้อความซ้ำ)
+          handedOff=true; maruBusy=false; sendB.disabled=false;
+          return window.maruSend(text);   // ถามซ้ำพร้อมรหัส
         }
       } else if(r.ok){
         maruAdd(r.reply,'ai');
@@ -1624,7 +1714,8 @@ function bindMaruAssistant(currentPage){
       }
     }catch(err){
       maruNoDots(); maruAdd('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','er');
+    }finally{
+      if(!handedOff){ maruBusy=false; sendB.disabled=false; }
     }
-    maruBusy=false; sendB.disabled=false;
   };
 }
