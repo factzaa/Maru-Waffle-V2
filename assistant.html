@@ -104,22 +104,36 @@ function showTyping(){
 }
 function hideTyping(){ const t=$('typing'); if(t) t.remove(); }
 
+function awTimeout(p, ms){
+  return new Promise(function(resolve,reject){
+    var to=setTimeout(function(){ reject(new Error('__timeout__')); }, ms);
+    Promise.resolve(p).then(function(v){ clearTimeout(to); resolve(v); }, function(e){ clearTimeout(to); reject(e); });
+  });
+}
 async function doSend(forceText){
   const text=(typeof forceText==='string')?forceText:inp.value.trim();
   if(!text || busy) return;
   busy=true; sendBtn.disabled=true;
+  let handedOff=false;
   if(typeof forceText!=='string'){ addMsg(text,'me'); inp.value=''; inp.style.height='auto'; }
   showTyping();
   try{
     let owner=''; try{ owner=sessionStorage.getItem('maruOwner')||''; }catch(e){}
-    const r=await api('askAI', { message:text, history:history, ownerCode:owner });
+    let asCtx='';
+    try{ asCtx = (window.maruBuildContext ? await window.maruBuildContext(text) : ''); }catch(e){}
+    let r=null, lastErr=null;
+    for(let attempt=0; attempt<2; attempt++){
+      try{ r=await awTimeout(api('askAI', { message:text, history:history, context:asCtx, ownerCode:owner }), 45000); lastErr=null; break; }
+      catch(e){ lastErr=e; if(attempt===0){ await new Promise(function(res){ setTimeout(res,800); }); } }
+    }
     hideTyping();
+    if(lastErr){ addMsg((lastErr&&lastErr.message==='__timeout__')?'มารุคิดนานไปหน่อย ลองถามใหม่อีกครั้งนะครับ 🐤':'เชื่อมต่อไม่ได้ ลองใหม่อีกครั้งนะครับ','err'); return; }
     if(r.ok && r.needOwner){
       addMsg(r.reply,'ai');
       const code=prompt('🔒 ใส่รหัสเจ้าของ เพื่อดูข้อมูลค่าจ้าง/เงินเดือน');
       if(code){
         try{ sessionStorage.setItem('maruOwner', code); }catch(e){}
-        busy=false; sendBtn.disabled=false;
+        handedOff=true; busy=false; sendBtn.disabled=false;
         return doSend(text);
       }
     }else if(r.ok){
@@ -133,8 +147,9 @@ async function doSend(forceText){
   }catch(err){
     hideTyping();
     addMsg('เชื่อมต่อไม่ได้ ลองใหม่อีกครั้งนะครับ','err');
+  }finally{
+    if(!handedOff){ busy=false; sendBtn.disabled=false; inp.focus(); }
   }
-  busy=false; sendBtn.disabled=false; inp.focus();
 }
 </script>
 </body>
