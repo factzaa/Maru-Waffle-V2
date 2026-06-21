@@ -126,7 +126,7 @@ function apiSWR(action, params, onData){
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
 const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
-const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1 };
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -857,6 +857,7 @@ async function sbGetAlerts(){
     }
   }catch(e){}
   try{ var d60=sbFmtD(new Date(now.getTime()-60*86400000)); var ah=await api('getStockAuditHistory',{start:d60,end:today}); var recs=(ah&&ah.records)||[]; var lastA=recs.length?recs[0].date:null; var since=lastA?Math.floor((new Date(today+'T00:00:00')-new Date(lastA+'T00:00:00'))/86400000):999; if(since>=7) alerts.push({ id:'audit-old-'+today, level:'info', icon:'🔵', title:'ควรตรวจนับสต๊อก', msg:(lastA?'ตรวจนับล่าสุด '+sbDM(lastA)+' ('+since+' วันก่อน)':'ยังไม่เคยตรวจนับ')+' ควรตรวจนับเพื่อความแม่นยำ', page:'stock-audit.html' }); }catch(e){}
+  try{ var rp=await api('getRemitPending',{}); if(rp && rp.netAmount>0 && rp.days && rp.days.length){ var sinceR=Math.floor((new Date(today+'T00:00:00')-new Date(rp.periodStart+'T00:00:00'))/86400000); alerts.push({ id:'remit-'+today, level:(sinceR>=7?'warn':'info'), icon:(sinceR>=7?'🟡':'🔵'), title:'มีเงินสดรอนำส่ง', msg:'ยอด '+Math.round(rp.netAmount).toLocaleString('en-US')+' บาท ('+rp.days.length+' วัน) ยังไม่ได้นำส่ง', page:'cash-remit.html' }); } }catch(e){}
   var order={crit:0,warn:1,info:2};
   alerts.sort(function(a,b){ return (order[a.level]||9)-(order[b.level]||9); });
   return { ok:true, alerts:alerts, count:alerts.length };
@@ -874,6 +875,51 @@ async function sbCheckStockItemUsage(p){
   var balance=0; try{ var bal=await api('getStockBalances',{date:sbFmtD(new Date()),category:'all'}); if(bal&&bal.items){ var fnd=bal.items.find(function(x){return x.id===id;}); if(fnd) balance=Number(fnd.balance)||0; } }catch(e){}
   return { ok:true, item:{ id:it.item_id, name:it.name, category:it.category, unit:it.unit, active:it.active!==false }, balance:balance,
            usage:{ withdraw:wd, receive:rc, daily:dl, audit:ad, total:total }, canHardDelete: total===0 };
+}
+
+// ===== ระบบเงินสดนำส่ง (cash remittance) =====
+async function sbGetRemitPending(){
+  var today = sbFmtD(new Date());
+  var remits = await sbFetch('cash_remittance?select=period_end&order=period_end.desc&limit=1');
+  var start = null;
+  if(remits && remits.length && remits[0].period_end){ var d=new Date(remits[0].period_end+'T00:00:00'); d.setDate(d.getDate()+1); start=sbFmtD(d); }
+  var salesQ = 'sales?select=sale_date,cash,closed_by&sale_date=lte.'+today+(start?('&sale_date=gte.'+start):'')+'&order=sale_date.asc';
+  var expQ   = 'expenses?select=exp_date,item,amount,type&type=eq.pos&exp_date=lte.'+today+(start?('&exp_date=gte.'+start):'');   // หักเฉพาะ POS (เงินออกจากลิ้นชัก)
+  var rr = await Promise.all([sbFetch(salesQ), sbFetch(expQ)]);
+  var sales=rr[0]||[], exps=rr[1]||[];
+  var days=[], cashTotal=0, notClosed=[];
+  sales.forEach(function(s){
+    var closed = (s.closed_by && String(s.closed_by).trim()!=='');
+    if(closed){ var c=Number(s.cash)||0; days.push({ date:s.sale_date, dateDM:sbDM(s.sale_date), cash:c, closedBy:s.closed_by }); cashTotal+=c; }
+    else if((Number(s.cash)||0)!==0 || true) notClosed.push(s.sale_date);
+  });
+  var expenseTotal=0, expList=[];
+  exps.forEach(function(e){ var a=Number(e.amount)||0; if(a>0){ expenseTotal+=a; expList.push({ date:e.exp_date, dateDM:sbDM(e.exp_date), item:e.item||'', amount:a, type:e.type||'pos' }); } });
+  var net = Math.round((cashTotal-expenseTotal)*100)/100;
+  return { ok:true, periodStart:(start||(days.length?days[0].date:today)), periodEnd:today,
+           days:days, cashTotal:cashTotal, expenseTotal:expenseTotal, expenses:expList,
+           netAmount:net, notClosed:notClosed };
+}
+async function sbSubmitRemit(p){
+  var d=(p&&p.data)||{};
+  if(!d.submittedBy || !String(d.submittedBy).trim()) return { ok:false, error:'กรุณากรอกชื่อผู้นำส่ง' };
+  var pend = await sbGetRemitPending();
+  if(!pend.days.length) return { ok:false, error:'ยังไม่มีวันที่ปิดรอบให้นำส่งในรอบนี้' };
+  var slip='';
+  try{ if(d.slip && d.slip.base64) slip = await sbUploadImage('remit-slips', d.slip); }
+  catch(e){ return { ok:false, error:'อัปสลิปไม่สำเร็จ: '+String(e.message||e) }; }
+  var amt = Number(d.submittedAmount)||0;
+  var row = { period_start:pend.periodStart, period_end:pend.periodEnd, cash_total:pend.cashTotal, expense_total:pend.expenseTotal,
+    net_amount:pend.netAmount, included_dates:pend.days.map(function(x){return x.date;}), status:'submitted',
+    submitted_by:d.submittedBy, submitted_amount:amt, slip_url:slip||null, submitted_at:new Date().toISOString(),
+    diff:Math.round((amt-pend.netAmount)*100)/100, note:d.note||null, created_at:new Date().toISOString() };
+  var res = await sbInsert('cash_remittance', row);
+  if(!res.ok) return res;
+  return { ok:true, msg:'บันทึกการนำส่งแล้ว ✓ รอเจ้าของยืนยัน', net:pend.netAmount };
+}
+async function sbGetRemitHistory(){
+  var rows = await sbFetch('cash_remittance?select=*&order=id.desc&limit=50');
+  return { ok:true, remits: rows||[] };
 }
 
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
@@ -905,7 +951,10 @@ const SB_ACTIONS = {
   getAttendBranches: sbGetAttendBranches,
   saveAttendBranch:  sbSaveAttendBranch,
   getAlerts:         sbGetAlerts,
-  checkStockItemUsage: sbCheckStockItemUsage
+  checkStockItemUsage: sbCheckStockItemUsage,
+  getRemitPending:   sbGetRemitPending,
+  submitRemit:       sbSubmitRemit,
+  getRemitHistory:   sbGetRemitHistory
 };
  
 async function api(action, params){
@@ -994,6 +1043,7 @@ function buildSidebar(currentPage){
     { page:'stockAudit',     href:'stock-audit.html',     icon:'check',   label:'ออดิทสต๊อก' },
     { page:'attendSetup',    href:'attend-setup.html',    icon:'edit',    label:'จัดการพนักงาน/สาขา' },
     { page:'payments',       href:'payments.html',        icon:'receipt', label:'💰 การจ่ายเงิน' },
+    { page:'cashRemit',      href:'cash-remit.html',      icon:'check',   label:'💵 เงินสดนำส่ง' },
     { group: '🐤 อื่นๆ' },
     { page:'assistant',      href:'assistant.html',       icon:'sparkles', label:'🐤 ผู้ช่วยมารุ' },
     { page:'manual',         href:'manual.html',          icon:'check',   label:'คู่มือการใช้งาน' },
