@@ -1263,6 +1263,7 @@ function maruThaiVoices(){
 }
 function maruCleanForSpeech(text){
   var t = String(text || '');
+  t = t.replace(/https?:\/\/[^\s]+/g, ' ลิงก์ ');   // ลิงก์เปล่า → ไม่อ่านออกเสียง
   t = t.replace(/```[\s\S]*?```/g, ' ');      // โค้ดบล็อก
   t = t.replace(/`([^`]*)`/g, '$1');           // โค้ดอินไลน์
   t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ');  // รูป
@@ -1276,6 +1277,20 @@ function maruCleanForSpeech(text){
   t = t.replace(/\s{2,}/g, ' ').trim();         // ช่องว่างซ้ำ
   return t;
 }
+// ===== แปลงข้อความมารุเป็น HTML: ลิงก์กดได้ + รูปจากลิงก์โชว์เป็นภาพ =====
+function maruRich(text){
+  var esc = escHtml(String(text == null ? '' : text));
+  esc = esc.replace(/(https?:\/\/[^\s<]+)/g, function(u){
+    var clean = u.replace(/[.,)\]]+$/, ''), trail = u.slice(clean.length);
+    var isImg = /\.(jpe?g|png|webp|gif)(\?|$)/i.test(clean) || /(i\.ibb\.co|googleusercontent\.com|\.supabase\.co\/storage|drive\.google\.com\/uc)/i.test(clean);
+    if(isImg){
+      return '<a href="'+clean+'" target="_blank" rel="noopener"><img src="'+clean+'" alt="รูป" loading="lazy" style="max-width:100%;max-height:260px;border-radius:11px;margin:6px 0;display:block;border:1px solid #ECE6D6;"></a>'+trail;
+    }
+    return '<a href="'+clean+'" target="_blank" rel="noopener" style="color:#1E9E50;word-break:break-all;">'+clean+'</a>'+trail;
+  });
+  return esc.replace(/\n/g, '<br>');
+}
+
 function maruPlay(text){
   try{
     if(!window.speechSynthesis) return;
@@ -1645,7 +1660,8 @@ function bindMaruAssistant(currentPage){
 
   function maruAdd(text, cls){
     var hi = msgs.querySelector('.maru-hi'); if(hi) hi.remove();
-    var d = document.createElement('div'); d.className='maru-b '+cls; d.textContent=text;
+    var d = document.createElement('div'); d.className='maru-b '+cls;
+    if(cls==='ai'){ d.innerHTML = maruRich(text); } else { d.textContent = text; }
     msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight; return d;
   }
   function maruDots(){ var d=document.createElement('div'); d.className='maru-dots'; d.id='maruDots'; d.innerHTML='<span></span><span></span><span></span>'; msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight; }
