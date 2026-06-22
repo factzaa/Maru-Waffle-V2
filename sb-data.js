@@ -193,7 +193,17 @@
       const posRows = exps.filter(function (e) { return (Number(e.amount) || 0) > 0 || (e.item || '').trim(); })
         .map(function (e) { return { exp_date: date, item: e.item || '', amount: Number(e.amount) || 0, receipt_url: e.existingUrl || '', type: 'pos', created_at: new Date().toISOString() }; });
       if (posRows.length) await sbWrite('POST', 'expenses', posRows);
-      return { ok: true, msg: 'บันทึกรายงานสิ้นวันแล้ว ✓ (ยังไม่ส่ง LINE — รอ Edge Function)' };
+      // ส่งแจ้งเตือนเข้า LINE (Flex รายงานสิ้นวัน) ผ่าน Edge — ไม่บล็อกถ้าพลาด
+      var lineMsg = 'บันทึกรายงานสิ้นวันแล้ว ✓';
+      try {
+        if (window.maruBuildDailyFlex && window.maruNotifyLine) {
+          var flex = window.maruBuildDailyFlex({ date: date, sales: sales, note: data.note || '' }, total, posSum, recon);
+          var lr = await window.maruNotifyLine([flex]);
+          if (lr && lr.ok) lineMsg = 'บันทึก + ส่งเข้า LINE แล้ว ✓ (' + date + ')';
+          else lineMsg = 'บันทึกแล้ว ✓ · ส่ง LINE ไม่สำเร็จ';
+        }
+      } catch (e) {}
+      return { ok: true, msg: lineMsg };
     } catch (e) { return { ok: false, error: String(e.message || e) }; }
   }
 
