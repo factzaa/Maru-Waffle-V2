@@ -22,6 +22,7 @@
 .msg.err{align-self:center;background:#FEF2F2;color:#B91C1C;font-size:12.5px;border-radius:11px;max-width:90%;text-align:center;}
 .hello{text-align:center;color:var(--ink-2);padding:24px 18px;}
 .hello .em{font-size:46px;margin-bottom:8px;}
+.hello img.em{width:108px;height:auto;display:block;margin:0 auto 8px;filter:drop-shadow(0 4px 10px rgba(120,86,0,.16));}
 .hello .t{font-family:'Kanit';font-weight:700;font-size:16px;color:var(--ink);}
 .hello .s{font-size:12.5px;margin-top:5px;line-height:1.5;}
 .chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px;}
@@ -34,7 +35,7 @@
 .inbar{display:flex;gap:8px;padding:10px 4px calc(10px + env(safe-area-inset-bottom));align-items:flex-end;border-top:1px solid var(--line);background:var(--bg);}
 .inbar textarea{flex:1;resize:none;border:1.5px solid var(--line);border-radius:14px;padding:11px 14px;font-family:'Sarabun';font-size:14px;max-height:120px;line-height:1.4;background:#fff;color:var(--ink);}
 .inbar textarea:focus{outline:none;border-color:#FFC629;}
-.sendb{width:46px;height:46px;border-radius:50%;border:0;background:#1A1A1A;color:#FFC629;font-size:19px;cursor:pointer;flex-shrink:0;}
+.sendb{width:46px;height:46px;border-radius:50%;border:0;background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#1A1A1A;font-size:19px;cursor:pointer;flex-shrink:0;box-shadow:0 3px 9px rgba(242,177,0,.4);}
 .sendb:disabled{opacity:.4;}
 .note{font-size:11px;color:var(--ink-2);text-align:center;padding:2px 10px 6px;}
 </style>
@@ -49,7 +50,7 @@
     <div class="chat-wrap">
       <div class="msgs" id="msgs">
         <div class="hello" id="hello">
-          <div class="em">🐤</div>
+          <img class="em" src="Logo.png" alt="มารุ" onerror="this.outerHTML='<div class=&quot;em&quot;>🐤</div>'">
           <div class="t">สวัสดีครับ ผมผู้ช่วยมารุ</div>
           <div class="s">คุยเล่น ปรึกษา หรือถามอะไรก็ได้เลย<br>เหนื่อยๆ มาคุยเป็นเพื่อนกันได้นะ 😊</div>
           <div class="chips" id="chips">
