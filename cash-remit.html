@@ -24,7 +24,7 @@
   .row .r{font-weight:700;font-family:'Kanit';}
   .calc{background:#FFF7E0;border-radius:12px;padding:11px 13px;margin:10px 0;}
   .calc .row{border-bottom:1px dashed #ECDFB4;}
-  .btn{width:100%;border:0;border-radius:13px;padding:14px;font-family:'Kanit';font-weight:700;font-size:15.5px;cursor:pointer;background:#1A1A1A;color:#FFC629;margin-top:6px;}
+  .btn{width:100%;border:0;border-radius:13px;padding:14px;font-family:'Kanit';font-weight:700;font-size:15.5px;cursor:pointer;background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#1A1A1A;margin-top:6px;box-shadow:0 3px 10px rgba(242,177,0,.35);}
   .btn.green{background:#1E9E50;color:#fff;}
   .btn.ghost{background:#fff;color:#1A1A1A;border:1.5px solid #E8DFC4;}
   .pill{display:inline-block;font-family:'Kanit';font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;}
@@ -62,6 +62,8 @@
   <div class="modal-bg" id="submitModal">
     <div class="modal">
       <h3>บันทึกการนำส่งเงินสด</h3>
+      <label>ถึงวันที่นำส่ง (เลือกได้ ถ้าไม่ส่งทั้งรอบ)</label>
+      <input type="date" id="mEnd">
       <div class="calc" id="mCalc"></div>
       <label>ผู้นำส่ง *</label>
       <input type="text" id="mBy" placeholder="ชื่อพนักงานที่นำเงินเข้าบัญชี">
@@ -151,17 +153,40 @@ function renderHistory(remits){
   }).join('');
 }
 
+function recalcByEnd(end){
+  var days = (pend.days||[]).filter(function(x){ return !end || x.date <= end; });
+  var exps = (pend.expenses||[]).filter(function(x){ return !end || x.date <= end; });
+  var cashTotal = days.reduce(function(s,x){ return s+(Number(x.cash)||0); }, 0);
+  var expTotal  = exps.reduce(function(s,x){ return s+(Number(x.amount)||0); }, 0);
+  var net = Math.round((cashTotal-expTotal)*100)/100;
+  return { cashTotal:cashTotal, expTotal:expTotal, net:net, dayCount:days.length };
+}
+function updateCalc(){
+  var end = $('mEnd').value || pend.periodEnd;
+  var c = recalcByEnd(end);
+  var note = (end && end < pend.periodEnd)
+    ? '<div class="row"><span style="color:#92400E;font-size:12px;">* ส่งเฉพาะถึง '+end+' ('+c.dayCount+' วัน) — วันที่เหลือจะค้างรอบถัดไป</span></div>'
+    : '';
+  $('mCalc').innerHTML = '<div class="row"><span>ยอดขายเงินสด</span><span class="r">'+baht(c.cashTotal)+'</span></div>'
+    + '<div class="row"><span>หักค่าใช้จ่าย POS</span><span class="r" style="color:#B91C1C;">-'+baht(c.expTotal)+'</span></div>'
+    + '<div class="row"><span><b>ยอดนำส่ง (ระบบคำนวณ)</b></span><span class="r" style="color:#1E9E50;">'+baht(c.net)+'</span></div>'
+    + note;
+  $('mAmt').value = Math.round(c.net);
+}
 function openSubmit(){
   if(!pend || !pend.days.length) return;
   slipObj = null;
-  $('mCalc').innerHTML = '<div class="row"><span>ยอดขายเงินสด</span><span class="r">'+baht(pend.cashTotal)+'</span></div>'
-    + '<div class="row"><span>หักค่าใช้จ่าย POS</span><span class="r" style="color:#B91C1C;">-'+baht(pend.expenseTotal)+'</span></div>'
-    + '<div class="row"><span><b>ยอดนำส่ง (ระบบคำนวณ)</b></span><span class="r" style="color:#1E9E50;">'+baht(pend.netAmount)+'</span></div>';
-  $('mBy').value=''; $('mAmt').value=Math.round(pend.netAmount); $('mNote').value='';
+  var startD = pend.periodStart || (pend.days[0] && pend.days[0].date) || pend.periodEnd;
+  $('mEnd').value = pend.periodEnd;
+  $('mEnd').min = startD;
+  $('mEnd').max = pend.periodEnd;
+  updateCalc();
+  $('mBy').value=''; $('mNote').value='';
   $('mSlipPv').style.display='none'; $('mSlipBtn').innerHTML='📎 แนบสลิปโอน';
   $('submitModal').classList.add('show');
 }
 $('mCancel').addEventListener('click', function(){ $('submitModal').classList.remove('show'); });
+$('mEnd').addEventListener('change', updateCalc);
 $('submitModal').addEventListener('click', function(e){ if(e.target===$('submitModal')) $('submitModal').classList.remove('show'); });
 $('mSlipBtn').addEventListener('click', function(){
   setReceiptHandler(function(file){
@@ -173,7 +198,7 @@ $('mSave').addEventListener('click', function(){
   var by=$('mBy').value.trim(); if(!by){ toast('กรอกชื่อผู้นำส่ง'); return; }
   var amt=parseFloat($('mAmt').value)||0;
   var btn=this; btn.disabled=true; btn.textContent='กำลังบันทึก...';
-  api('submitRemit', { data:{ submittedBy:by, submittedAmount:amt, slip:slipObj, note:$('mNote').value.trim() } })
+  api('submitRemit', { data:{ submittedBy:by, submittedAmount:amt, slip:slipObj, note:$('mNote').value.trim(), periodEnd:($('mEnd').value||null) } })
     .then(function(res){ btn.disabled=false; btn.textContent='✓ บันทึกการนำส่ง'; if(res&&res.ok){ toast(res.msg||'บันทึกแล้ว ✓'); $('submitModal').classList.remove('show'); loadAll(); } else { toast(res.error||'บันทึกไม่สำเร็จ'); } })
     .catch(function(e){ btn.disabled=false; btn.textContent='✓ บันทึกการนำส่ง'; toast('ผิดพลาด: '+e.message); });
 });
