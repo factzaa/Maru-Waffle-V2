@@ -15,12 +15,12 @@
 
 <style>
 /* TOC */
-.toc{background:#1A1A1A;color:#fff;border-radius:14px;padding:16px 18px;margin-bottom:18px;}
-.toc h3{font-family:'Kanit';font-weight:700;font-size:16px;color:#FFC629;margin:0 0 10px;}
+.toc{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:18px;}
+.toc h3{font-family:'Kanit';font-weight:700;font-size:16px;color:#1A1A1A;margin:0 0 10px;}
 .toc ol{margin:0;padding-left:22px;font-family:'Kanit';font-weight:500;font-size:14px;line-height:1.85;}
-.toc ol a{color:#fff;text-decoration:none;}
-.toc ol a:hover{color:#FFC629;}
-.toc ol ol{margin-top:3px;padding-left:18px;font-size:13px;font-weight:400;color:#D4CFC4;}
+.toc ol a{color:#1A1A1A;text-decoration:none;}
+.toc ol a:hover{color:#E0A200;}
+.toc ol ol{margin-top:3px;padding-left:18px;font-size:13px;font-weight:400;color:var(--ink-2);}
 
 /* Section headers */
 h2.sec{font-family:'Kanit';font-weight:800;font-size:22px;color:var(--ink);margin:32px 0 14px;padding:14px 16px;
@@ -29,6 +29,7 @@ h2.sec{font-family:'Kanit';font-weight:800;font-size:22px;color:var(--ink);margi
 h2.sec.staff{background:linear-gradient(135deg,#22C55E,#15803D);color:#fff;}
 h2.sec.admin{background:linear-gradient(135deg,#A78BFA,#6D28D9);color:#fff;}
 h2.sec.faq{background:linear-gradient(135deg,#3DD5DC,#1B98A4);color:#fff;}
+h2.sec.maru{background:linear-gradient(135deg,#FFC629,#F5A800);color:#3A2E00;}
 
 h3.sub{font-family:'Kanit';font-weight:700;font-size:17px;color:var(--ink);margin:24px 0 10px;
   padding-left:12px;border-left:4px solid var(--yellow);}
@@ -85,7 +86,7 @@ h4.step{font-family:'Kanit';font-weight:700;font-size:15px;color:var(--ink);marg
 .print-bar{background:#fff;border-radius:14px;padding:14px;margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:center;}
 .print-bar .pbtn{background:var(--yellow);color:var(--ink);border:0;padding:11px 22px;border-radius:11px;
   font-family:'Kanit';font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 3px 10px rgba(242,177,0,.4);}
-.print-bar .pbtn.alt{background:#1A1A1A;color:#FFC629;}
+.print-bar .pbtn.alt{background:#fff;color:#1A1A1A;border:1.5px solid #E8DFC4;}
 
 /* Print mode */
 @media print {
@@ -135,6 +136,7 @@ html { scroll-behavior: smooth; }
             <li><a href="#morning">🌅 ตอนเช้า — เปิดร้าน</a></li>
             <li><a href="#midday">📋 ระหว่างวัน</a></li>
             <li><a href="#evening">🌙 ตอนเย็น — ปิดร้าน</a></li>
+            <li><a href="#remit-staff">💵 นำส่งเงินสด</a></li>
           </ol>
         </li>
         <li><a href="#admin">👔 สำหรับผู้จัดการ</a>
@@ -142,8 +144,11 @@ html { scroll-behavior: smooth; }
             <li><a href="#reports">📊 ดูรายงาน</a></li>
             <li><a href="#manage-stock">🔧 จัดการสต๊อก</a></li>
             <li><a href="#manage-staff">👥 จัดการพนักงาน + สาขา</a></li>
+            <li><a href="#remit-owner">💵 ตรวจรับเงินนำส่ง</a></li>
+            <li><a href="#payroll">💰 การจ่ายเงิน / เงินเดือน</a></li>
           </ol>
         </li>
+        <li><a href="#maru">🐤 ผู้ช่วยมารุ</a></li>
         <li><a href="#faq">❓ คำถามที่พบบ่อย</a></li>
       </ol>
     </div>
@@ -158,6 +163,8 @@ html { scroll-behavior: smooth; }
       <li>📦 <b>จัดการสต๊อกสินค้า</b> (เบิก / รับเข้า / ปิดร้าน / ตรวจนับ)</li>
       <li>💰 <b>บันทึกยอดขายรายวัน</b> + แดชบอร์ดสรุป</li>
       <li>🧾 <b>บันทึกค่าใช้จ่ายร้าน</b> + แนบรูปบิล</li>
+      <li>💵 <b>ตรวจสอบเงินสดนำส่ง</b> เข้าบัญชีร้าน</li>
+      <li>🐤 <b>ผู้ช่วยมารุ AI</b> ถามข้อมูลร้าน + ช่วยทำโพสต์ขายของ</li>
     </ul>
     <div class="ok">
       <b>ทุกอย่างเก็บใน Google Sheet ของเจ้าของร้านอัตโนมัติ</b> และส่งแจ้งเตือนเข้า <b>LINE กลุ่ม</b> ทุกเหตุการณ์สำคัญ
@@ -300,6 +307,23 @@ html { scroll-behavior: smooth; }
       <li>ตรวจสอบว่า LINE มีแจ้งเตือนออกงานเข้ามาเรียบร้อย</li>
     </ol>
 
+    <h3 class="sub" id="remit-staff">💵 นำส่งเงินสด (นำเงินเข้าบัญชีร้าน)</h3>
+    <p style="font-size:14px;color:var(--ink-2);">เมื่อถึงรอบนำเงินสดในลิ้นชักเข้าบัญชีร้าน ทำตามนี้</p>
+    <ol class="steps">
+      <li>กด <b>☰</b> → <b>"เงินสดนำส่ง"</b></li>
+      <li>การ์ดบนสุดจะบอก <b>"ยอดรอนำส่ง"</b> ที่ระบบคำนวณให้ (ยอดขายเงินสด − ค่าใช้จ่าย POS ในรอบ)</li>
+      <li>กดปุ่ม <b>"📤 บันทึกการนำส่ง"</b></li>
+      <li>กรอก<b>ชื่อผู้นำส่ง</b> + <b>ยอดที่นำส่งจริง</b> (โอนเข้าบัญชีเท่าไหร่)</li>
+      <li>แนบ<b>สลิปโอน</b> (ไม่บังคับ แต่แนะนำให้แนบ)</li>
+      <li>กด <b>"✓ บันทึกการนำส่ง"</b> → รอเจ้าของยืนยัน</li>
+    </ol>
+    <div class="tip">
+      <b>ส่งแค่บางช่วงได้:</b> ถ้ารอบเป็น 1–22 แต่จะส่งแค่ถึงวันที่ 20 — เลือก <b>"ถึงวันที่นำส่ง"</b> เป็นวันที่ 20 ระบบจะคำนวณยอดใหม่ให้ทันที ส่วนวันที่ 21–22 จะค้างไว้รอบถัดไปอัตโนมัติ
+    </div>
+    <div class="warn">
+      ยอดที่นำส่งจริงควรตรงกับยอดที่ระบบคำนวณ ถ้าต่างกัน ระบบจะแสดง<b>ส่วนต่าง</b>ให้เจ้าของเห็นตอนยืนยัน
+    </div>
+
     <!-- ============================ -->
     <!-- ====== สำหรับผู้จัดการ ====== -->
     <!-- ============================ -->
@@ -400,6 +424,49 @@ html { scroll-behavior: smooth; }
       ถ้าตั้งรัศมีกว้างไป (เช่น 500 ม.) จะตรวจสอบไม่ได้ว่าพนักงานอยู่ที่ร้านจริง
       ถ้าแคบไป (เช่น 10 ม.) อาจเช็คอินไม่ผ่านเพราะ GPS คลาดเคลื่อน — <b>50-100 ม. กำลังดี</b>
     </div>
+
+    <h3 class="sub" id="remit-owner">💵 ตรวจรับเงินนำส่ง (เจ้าของ)</h3>
+    <ol class="steps">
+      <li>กด <b>☰</b> → <b>"เงินสดนำส่ง"</b></li>
+      <li>การ์ด <b>"🔐 รอเจ้าของยืนยัน"</b> จะแสดงรายการที่พนักงานนำส่งมา</li>
+      <li>ดูว่ายอดที่นำส่งจริงตรงกับที่ระบบคำนวณไหม (ระบบบอกส่วนต่างให้)</li>
+      <li>ถ้าถูกต้อง กด <b>"✓ ยืนยันรับเงิน"</b> → ใส่<b>รหัสเจ้าของ</b></li>
+      <li>ถ้าผิดปกติ กด <b>"ทักท้วง"</b> + ใส่เหตุผล</li>
+    </ol>
+    <div class="tip">หลังยืนยัน รอบใหม่จะเริ่มนับจากวันถัดจากวันที่นำส่งล่าสุดให้อัตโนมัติ</div>
+
+    <h3 class="sub" id="payroll">💰 การจ่ายเงิน / เงินเดือน (เจ้าของ)</h3>
+    <div class="warn">หน้านี้มีข้อมูลค่าจ้าง/เงินเดือน ต้องใส่ <b>รหัสเจ้าของ</b> ก่อนเข้าดู</div>
+    <ol class="steps">
+      <li>กด <b>☰</b> → <b>"การจ่ายเงิน"</b></li>
+      <li>ใส่<b>รหัสเจ้าของ</b>เพื่อปลดล็อก</li>
+      <li>ดูสถานะการจ่ายของพนักงานแต่ละคน (รอบ / ยอด / จ่ายแล้วหรือยัง)</li>
+      <li>เมื่อจ่ายเงินจริงแล้ว กด<b>บันทึกการจ่าย</b>เพื่อปิดยอดรอบนั้น</li>
+    </ol>
+
+    <!-- ============================ -->
+    <!-- ====== ผู้ช่วยมารุ ====== -->
+    <!-- ============================ -->
+    <h2 class="sec maru" id="maru">🐤 ผู้ช่วยมารุ</h2>
+    <p style="font-size:14px;color:var(--ink-2);">มารุเป็นผู้ช่วย AI ในแอป ถามข้อมูลร้านหรือให้ช่วยทำโพสต์ขายของได้ — เปิดได้จากปุ่มมารุมุมขวาล่าง หรือเมนู → "ผู้ช่วยมารุ"</p>
+
+    <h3 class="sub" id="maru-ask">💬 ถามข้อมูลร้าน</h3>
+    <ol class="steps">
+      <li>กดปุ่ม<b>คำถามด่วน</b> (ยอดขาย / สต๊อก / ค่าใช้จ่าย / เข้างาน) หรือพิมพ์ถามเอง</li>
+      <li>ตัวอย่างคำถาม: "ยอด Grab เดือนนี้เท่าไหร่", "มีของอะไรใกล้หมด", "เบิกล่าสุดเมื่อไหร่ ใครเบิก", "เงินสดรอนำส่งเท่าไหร่"</li>
+      <li>มารุดึง<b>ข้อมูลจริง</b>จากระบบมาตอบให้ (ยอดขาย/สต๊อก/ค่าใช้จ่าย/เข้างาน/เงินสด)</li>
+    </ol>
+    <div class="tip">ข้อมูลค่าจ้าง/เงินเดือนต้องใส่<b>รหัสเจ้าของ</b>ก่อนถาม</div>
+
+    <h3 class="sub" id="maru-promo">🎨 ทำโพสต์ขายของ</h3>
+    <ol class="steps">
+      <li>กดปุ่ม <b>📎</b> แนบรูปสินค้า (ถ้าอยากได้แค่แคปชั่น ไม่ต้องแนบก็ได้)</li>
+      <li>พิมพ์สิ่งที่ต้องการ เช่น <b>"ทำโพสต์ลด 20% ลงเฟส"</b> — ระบุช่องทางได้ (เฟส / LINE / IG / TikTok)</li>
+      <li>มารุร่าง<b>แคปชั่น</b>ให้ กดปุ่มคัดลอกไปโพสต์ได้เลย</li>
+      <li>ถ้าแนบรูป จะมี<b>สไตล์โปสเตอร์ 6 แบบ</b>ให้เลือก กดแล้วได้รูปพร้อมปุ่มดาวน์โหลด</li>
+      <li>อยากให้ AI แต่งภาพให้สวยขึ้น พิมพ์ <b>"แต่งรูป"</b> (ทำได้เฉพาะจากรูปที่แนบ)</li>
+    </ol>
+    <div class="tip">ในหน้าผู้ช่วยมีปุ่ม <b>"ℹ️ วิธีใช้โหมดการตลาด"</b> กดดูขั้นตอนแบบละเอียดได้ตลอด</div>
 
     <!-- ============================ -->
     <!-- ====== FAQ ====== -->
