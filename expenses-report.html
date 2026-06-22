@@ -6,7 +6,7 @@
 <title>รายงานสรุปค่าใช้จ่าย · Maru Waffle</title>
 
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#1A1A1A">
+<meta name="theme-color" content="#FFC629">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 
@@ -39,7 +39,7 @@
   .filters .ranges{display:flex;gap:6px;align-items:flex-end;flex:1;flex-wrap:wrap;}
   .filters .rg{border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:8px 12px;border-radius:9px;
     font-family:'Kanit';font-weight:600;font-size:12.5px;cursor:pointer;}
-  .filters .rg.on{background:var(--ink);color:#FFC629;border-color:var(--ink);}
+  .filters .rg.on{background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#2E2400;border-color:#F2B100;}
   .filters .btn-go{background:var(--yellow);color:var(--ink);border:0;font-family:'Kanit';font-weight:700;
     padding:9px 16px;border-radius:9px;cursor:pointer;font-size:13px;}
 
@@ -53,35 +53,35 @@
   .kpi .sub{font-size:11px;color:var(--ink-2);margin-top:2px;}
 
   /* ---------- KPI Dashboard for Manager ---------- */
-  .mgr-kpi{background:linear-gradient(135deg,#1A1A1A 0%,#2A2620 100%);border-radius:18px;padding:22px;margin-bottom:18px;
-    color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.18);}
+  .mgr-kpi{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px;
+    color:var(--ink);box-shadow:0 4px 16px rgba(120,86,0,.10);}
   .mgr-kpi .mh{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
   .mgr-kpi .mh .em{font-size:22px;}
-  .mgr-kpi .mh .tl{font-family:'Kanit';font-weight:700;font-size:17px;color:#FFC629;}
-  .mgr-kpi .mh .ds{font-size:12px;color:#9C8F7A;margin-top:1px;}
+  .mgr-kpi .mh .tl{font-family:'Kanit';font-weight:700;font-size:17px;color:#1A1A1A;}
+  .mgr-kpi .mh .ds{font-size:12px;color:var(--ink-2);margin-top:1px;}
   .mgr-kpi .gauges{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;}
-  .gauge{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:16px 18px;}
+  .gauge{background:#FFFAEC;border:1px solid var(--line);border-radius:14px;padding:16px 18px;}
   .gauge .gt{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:6px;}
-  .gauge .gt .lbl{font-family:'Kanit';font-weight:600;font-size:13px;color:#D4CFC4;}
+  .gauge .gt .lbl{font-family:'Kanit';font-weight:600;font-size:13px;color:var(--ink-2);}
   .gauge .gt .pill{font-family:'Kanit';font-weight:700;font-size:11px;padding:3px 10px;border-radius:20px;color:#fff;}
   .gauge .gt .pill.good{background:#1E9E50;}
   .gauge .gt .pill.warn{background:#F37316;}
   .gauge .gt .pill.bad{background:#D02C2C;}
   .gauge .val{font-family:'Kanit';font-weight:800;font-size:30px;line-height:1;margin-bottom:8px;}
-  .gauge .val .small{font-size:18px;color:#9C8F7A;font-weight:500;margin-left:3px;}
-  .gauge.good .val{color:#5EE6A4;}
-  .gauge.warn .val{color:#FFB04A;}
-  .gauge.bad  .val{color:#FF7878;}
-  .gauge .bar-wrap{position:relative;height:10px;background:rgba(255,255,255,.08);border-radius:6px;overflow:visible;margin:14px 0 8px;}
+  .gauge .val .small{font-size:18px;color:#8A8170;font-weight:500;margin-left:3px;}
+  .gauge.good .val{color:#1E9E50;}
+  .gauge.warn .val{color:#E07B00;}
+  .gauge.bad  .val{color:#D02C2C;}
+  .gauge .bar-wrap{position:relative;height:10px;background:#EFE7CF;border-radius:6px;overflow:visible;margin:14px 0 8px;}
   .gauge .bar{position:absolute;top:0;left:0;height:100%;border-radius:6px;transition:width .8s cubic-bezier(.2,.8,.2,1);
     background:linear-gradient(90deg,#1E9E50,#5EE6A4);}
   .gauge.warn .bar{background:linear-gradient(90deg,#F37316,#FFB04A);}
   .gauge.bad  .bar{background:linear-gradient(90deg,#D02C2C,#FF7878);}
-  .gauge .target-mark{position:absolute;top:-3px;width:2px;height:16px;background:#FFC629;border-radius:2px;}
+  .gauge .target-mark{position:absolute;top:-3px;width:2px;height:16px;background:#C8950F;border-radius:2px;}
   .gauge .target-mark::after{content:attr(data-label);position:absolute;top:-16px;left:50%;transform:translateX(-50%);
-    font-size:9.5px;font-weight:700;color:#FFC629;white-space:nowrap;font-family:'Kanit';}
-  .gauge .gfoot{font-size:12px;color:#9C8F7A;line-height:1.4;}
-  .gauge .gfoot b{color:#fff;font-family:'Kanit';font-weight:600;}
+    font-size:9.5px;font-weight:700;color:#B8860B;white-space:nowrap;font-family:'Kanit';}
+  .gauge .gfoot{font-size:12px;color:var(--ink-2);line-height:1.4;}
+  .gauge .gfoot b{color:var(--ink);font-family:'Kanit';font-weight:600;}
 
   .insight-box{margin-top:16px;background:rgba(255,198,41,.1);border:1px solid rgba(255,198,41,.25);
     border-radius:12px;padding:12px 16px;display:flex;gap:10px;align-items:flex-start;}
@@ -89,10 +89,10 @@
   .insight-box.warn{background:rgba(243,115,22,.12);border-color:rgba(255,176,74,.35);}
   .insight-box.bad {background:rgba(208,44,44,.15);border-color:rgba(255,120,120,.4);}
   .insight-box .em2{font-size:18px;flex:none;line-height:1.3;}
-  .insight-box .txt{font-size:13px;color:#E8E0C8;line-height:1.5;}
-  .insight-box .txt b{color:#FFC629;font-family:'Kanit';font-weight:700;}
+  .insight-box .txt{font-size:13px;color:var(--ink-2);line-height:1.5;}
+  .insight-box .txt b{color:#1A1A1A;font-family:'Kanit';font-weight:700;}
   .insight-box.bad .txt b{color:#FF9898;}
-  .insight-box.good .txt b{color:#5EE6A4;}
+  .insight-box.good .txt b{color:#1E9E50;}
 
   @media (max-width:560px){
     .mgr-kpi{padding:18px 14px;}
