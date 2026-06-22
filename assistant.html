@@ -28,6 +28,11 @@
 .chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:14px;}
 .chip{background:#fff;border:1.5px solid var(--line);border-radius:13px;padding:7px 12px;font-size:12.5px;color:var(--ink);cursor:pointer;font-family:'Sarabun';}
 .chip:active{background:#FFF7E0;}
+.quickq{margin-top:16px;text-align:left;}
+.quickq .qg{font-family:'Kanit';font-weight:700;font-size:12px;color:var(--ink-2);margin:13px 2px 7px;display:flex;align-items:center;gap:5px;}
+.quickq .qrow{display:flex;flex-wrap:wrap;gap:7px;}
+.quickq .chip{background:#fff;border:1.5px solid var(--line);border-radius:13px;padding:8px 13px;font-size:12.5px;color:var(--ink);cursor:pointer;font-family:'Sarabun';font-weight:600;transition:.12s;}
+.quickq .chip:active{background:#FFF1CC;transform:scale(.97);}
 .typing{align-self:flex-start;background:#fff;border:1px solid var(--line);border-radius:15px;border-bottom-left-radius:5px;padding:12px 15px;display:flex;gap:4px;}
 .typing span{width:7px;height:7px;border-radius:50%;background:#C9C1AE;animation:bz 1.2s infinite;}
 .typing span:nth-child(2){animation-delay:.2s;} .typing span:nth-child(3){animation-delay:.4s;}
@@ -37,6 +42,22 @@
 .inbar textarea:focus{outline:none;border-color:#FFC629;}
 .sendb{width:46px;height:46px;border-radius:50%;border:0;background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#1A1A1A;font-size:19px;cursor:pointer;flex-shrink:0;box-shadow:0 3px 9px rgba(242,177,0,.4);}
 .sendb:disabled{opacity:.4;}
+.att-btn{width:40px;height:46px;border:0;background:transparent;font-size:21px;cursor:pointer;flex-shrink:0;line-height:1;padding:0;}
+.att-chip{display:none;align-items:center;gap:9px;margin:0 4px 8px;background:#fff;border:1.5px solid var(--line);border-radius:12px;padding:7px 10px;}
+.att-chip.show{display:flex;}
+.att-chip img{width:38px;height:38px;border-radius:8px;object-fit:cover;flex:none;}
+.att-chip span{flex:1;min-width:0;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.att-chip button{border:0;background:#F2EEDD;color:var(--ink-2);width:24px;height:24px;border-radius:50%;cursor:pointer;flex:none;font-size:13px;}
+.cap-card{align-self:stretch;background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.cap-h{font-family:'Kanit';font-weight:700;font-size:13px;color:var(--ink-2);margin-bottom:6px;}
+.cap-b{font-size:13.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap;}
+.cap-copy{margin-top:9px;border:1.5px solid var(--line);background:#FFF7E0;color:var(--ink);font-family:'Kanit';font-weight:600;font-size:12.5px;padding:7px 13px;border-radius:9px;cursor:pointer;}
+.style-btn{border:1.5px solid #ECE6D6;background:#fff;color:#1A1A1A;font-family:'Kanit';font-weight:600;font-size:13px;padding:8px 13px;border-radius:10px;cursor:pointer;}
+.style-btn.on{background:#FFC629;border-color:#FFC629;}
+.poster-card{align-self:stretch;background:#fff;border:1px solid var(--line);border-radius:13px;padding:10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.04);}
+.poster-card img{max-width:100%;border-radius:10px;display:block;margin:0 auto;}
+.poster-card .pl{font-size:12px;color:var(--ink-2);margin:7px 0;font-family:'Kanit';font-weight:600;}
+.poster-dl{display:inline-block;background:#FFC629;color:#1A1A1A;font-family:'Kanit';font-weight:700;font-size:13px;padding:8px 16px;border-radius:10px;text-decoration:none;}
 .note{font-size:11px;color:var(--ink-2);text-align:center;padding:2px 10px 6px;}
 </style>
 </head>
@@ -53,19 +74,48 @@
           <img class="em" src="Logo.png" alt="มารุ" onerror="this.outerHTML='<div class=&quot;em&quot;>🐤</div>'">
           <div class="t">สวัสดีครับ ผมผู้ช่วยมารุ</div>
           <div class="s">คุยเล่น ปรึกษา หรือถามอะไรก็ได้เลย<br>เหนื่อยๆ มาคุยเป็นเพื่อนกันได้นะ 😊</div>
-          <div class="chips" id="chips">
-            <div class="chip">วันนี้เหนื่อยจัง</div>
-            <div class="chip">เล่ามุกหน่อย</div>
-            <div class="chip">กินอะไรดีตอนเย็น</div>
-            <div class="chip">ให้กำลังใจหน่อย</div>
+          <div class="quickq" id="chips">
+            <div class="qg">💰 ยอดขาย</div>
+            <div class="qrow">
+              <div class="chip" data-q="ยอดขายวันนี้รวมเท่าไหร่ แยกตามช่องทางด้วย">ยอดขายวันนี้</div>
+              <div class="chip" data-q="ยอด Grab เดือนนี้รวมเท่าไหร่ ขอแยกรายวันด้วย">ยอด Grab เดือนนี้</div>
+              <div class="chip" data-q="เดือนนี้ขายดีที่สุดวันไหน ยอดเท่าไหร่">วันขายดีสุด</div>
+            </div>
+            <div class="qg">📦 สต๊อก</div>
+            <div class="qrow">
+              <div class="chip" data-q="ตอนนี้มีสินค้าอะไรใกล้หมดหรือหมดสต๊อกบ้าง">ของใกล้หมด / หมด</div>
+              <div class="chip" data-q="มีของอะไรที่ควรสั่งซื้อเพิ่มบ้าง">ของที่ต้องสั่งเพิ่ม</div>
+              <div class="chip" data-q="เบิกของล่าสุดรายการอะไร เมื่อไหร่ กี่โมง ใครเบิก">เบิกล่าสุด</div>
+            </div>
+            <div class="qg">🧾 ค่าใช้จ่าย</div>
+            <div class="qrow">
+              <div class="chip" data-q="ค่าใช้จ่ายเดือนนี้รวมเท่าไหร่ คิดเป็นกี่เปอร์เซ็นต์ของยอดขาย">ค่าใช้จ่ายเดือนนี้</div>
+              <div class="chip" data-q="ขอดูรายการค่าใช้จ่ายล่าสุด 5 รายการ พร้อมวันที่และมีใบเสร็จไหม">รายการล่าสุด</div>
+            </div>
+            <div class="qg">⏰ เข้างาน / เงินสด</div>
+            <div class="qrow">
+              <div class="chip" data-q="วันนี้ใครเข้างานบ้าง กี่โมง อยู่ในเขตร้านไหม">ใครเข้างานวันนี้</div>
+              <div class="chip" data-q="ตอนนี้เงินสดรอนำส่งเท่าไหร่ คำนวณจากอะไรบ้าง">เงินสดรอนำส่ง</div>
+            </div>
+            <div class="qg">🎨 ทำโพสต์ / การตลาด</div>
+            <div class="qrow">
+              <div class="chip" data-help="1">ℹ️ วิธีใช้โหมดการตลาด</div>
+              <div class="chip" data-q="ทำโพสต์โปรโมชั่นลด 20% ลงเฟสบุ๊ก">ตัวอย่าง: โพสต์ลดราคา</div>
+              <div class="chip" data-q="เขียนแคปชั่นเปิดเมนูใหม่ ลง LINE">ตัวอย่าง: เปิดเมนูใหม่</div>
+            </div>
           </div>
         </div>
       </div>
+      <div class="att-chip" id="attChip">
+        <img id="attThumb" alt=""><span id="attName">รูปแนบ</span><button id="attRm" type="button" aria-label="ลบรูป">✕</button>
+      </div>
       <div class="inbar">
-        <textarea id="inp" rows="1" placeholder="พิมพ์ข้อความ..."></textarea>
+        <button class="att-btn" id="attBtn" type="button" title="แนบรูปทำโพสต์">📎</button>
+        <input type="file" accept="image/*" id="imgInput" style="display:none">
+        <textarea id="inp" rows="1" placeholder="พิมพ์ข้อความ... หรือแนบรูป 📎 ทำโพสต์"></textarea>
         <button class="sendb" id="send">➤</button>
       </div>
-      <div class="note">🔒 ยังไม่เชื่อมข้อมูลยอดขาย/การเงิน · บทสนทนาไม่ถูกบันทึกถาวร</div>
+      <div class="note">🐤 มารุดูข้อมูลยอดขาย สต๊อก ค่าใช้จ่าย เข้างาน และเงินสดให้ได้ · ข้อมูลค่าจ้าง/เงินเดือนต้องใส่รหัสเจ้าของ</div>
     </div>
   </div>
 </div>
@@ -78,6 +128,13 @@ const $ = function(id){return document.getElementById(id);};
 const msgsEl = $('msgs'), inp = $('inp'), sendBtn = $('send');
 let history = [];   // {role:'user'|'model', text}
 let busy = false;
+// ===== แนบรูป / ทำโพสต์การตลาด =====
+let promoImg = null;   // { imgEl, dataURL, name }
+const CHAN_LABEL = { facebook:'Facebook', line:'LINE', instagram:'Instagram', tiktok:'TikTok' };
+function chansFrom(t){ var c=[]; if(/เฟส|เฟซ|facebook|\bfb\b/i.test(t))c.push('facebook'); if(/ไลน์|line/i.test(t))c.push('line'); if(/ไอจี|\big\b|instagram|อินสตา/i.test(t))c.push('instagram'); if(/ติ๊?กต็?อก|ติ้กต็อก|tiktok/i.test(t))c.push('tiktok'); return c; }
+function wantsAi(t){ return /วาดรูป|วาดภาพ|สร้างภาพ|แต่งรูป|แต่งภาพ|ทำภาพใหม่|ภาพใหม่|ภาพ ?ai|ai ?image|เจน(เนอ)?เรท|ออกแบบภาพ|ครีเอทภาพ|แต่งฉาก/i.test(t); }
+function isPromo(t){ return /ทำโพสต์|สร้างโพสต์|ขอโพสต์|แคปชั่น|caption|โพสต์ขาย|โพสต์โปร|ทำโฆษณา|เขียนโฆษณา|โปรโมชั่น/i.test(t); }
+function clearAtt(){ promoImg=null; var chip=$('attChip'); if(chip) chip.classList.remove('show'); }
 
 // textarea auto-grow
 inp.addEventListener('input', function(){ inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,120)+'px'; });
@@ -86,9 +143,105 @@ inp.addEventListener('keydown', function(e){
 });
 sendBtn.addEventListener('click', doSend);
 $('chips').querySelectorAll('.chip').forEach(function(c){
-  c.addEventListener('click', function(){ inp.value=c.textContent; doSend(); });
+  c.addEventListener('click', function(){ if(c.dataset.help){ showMarketingHelp(); return; } inp.value=(c.dataset.q||c.textContent); doSend(); });
 });
+$('attBtn').addEventListener('click', function(){ $('imgInput').click(); });
+$('imgInput').addEventListener('change', function(){
+  var fl=this.files&&this.files[0]; this.value=''; if(!fl) return;
+  var rd=new FileReader();
+  rd.onload=function(){ var im=new Image(); im.onload=function(){ promoImg={imgEl:im,dataURL:rd.result,name:fl.name||'รูปแนบ'}; $('attThumb').src=rd.result; $('attName').textContent=fl.name||'รูปแนบ'; $('attChip').classList.add('show'); if(!window.__maruAttHinted){ window.__maruAttHinted=true; addMsg('แนบรูปแล้ว 🐤 พิมพ์สิ่งที่อยากได้ เช่น "ทำโพสต์ลด 20% ลงเฟส" แล้วเลือกสไตล์โปสเตอร์ · หรือพิมพ์ "แต่งรูป" ให้ AI แต่งภาพจากรูปนี้','ai'); } }; im.src=rd.result; };
+  rd.readAsDataURL(fl);
+});
+$('attRm').addEventListener('click', clearAtt);
 
+function showMarketingHelp(){
+  var t = '🎨 โหมดการตลาด — วิธีใช้\n\n'
+    + '1) อยากได้โปสเตอร์ กดปุ่ม 📎 แนบรูปสินค้าก่อน (ถ้าอยากได้แค่แคปชั่น ไม่ต้องแนบก็ได้)\n'
+    + '2) พิมพ์สิ่งที่ต้องการ เช่น "ทำโพสต์ลด 20% ลงเฟส" หรือ "เขียนแคปชั่นเปิดเมนูใหม่ ลง LINE"\n'
+    + '   • ระบุช่องทางได้: เฟส / LINE / IG / TikTok (ใส่หลายช่องก็ได้)\n'
+    + '3) มารุจะร่างแคปชั่นให้ กดปุ่มคัดลอกไปโพสต์ได้เลย\n'
+    + '   • ถ้าแนบรูป จะมีสไตล์โปสเตอร์ 6 แบบให้เลือก กดแล้วได้รูปพร้อมปุ่มดาวน์โหลด\n'
+    + '4) อยากให้ AI แต่งภาพให้สวยขึ้น พิมพ์ "แต่งรูป" (ทำได้เฉพาะจากรูปที่แนบเท่านั้น)\n\n'
+    + 'ลองแนบรูปแล้วพิมพ์ดูได้เลยครับ 🐤';
+  addMsg(t, 'ai');
+}
+async function runPromo(text){
+  var chans=chansFrom(text), wantAi=wantsAi(text);
+  if(wantAi && !promoImg){ addMsg('แต่งรูปได้เฉพาะจากรูปที่แนบมานะครับ 🐤 แนบรูปสินค้าก่อน แล้วสั่ง "แต่งรูป" อีกครั้งได้เลย','err'); return; }
+  showTyping();
+  try{
+    var r=await api('genPromoCaption', { brief:text, channels:chans });
+    hideTyping();
+    if(!(r&&r.ok&&r.captions)){ addMsg((r&&r.error)||'สร้างไม่สำเร็จ ลองใหม่นะครับ','err'); clearAtt(); return; }
+    addMsg('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่นไปโพสต์ได้เลย'+(promoImg?' · เลือกสไตล์โปสเตอร์ด้านล่างได้':''),'ai');
+    var caps=r.captions, order=(r.channels&&r.channels.length)?r.channels:Object.keys(caps), shown=0;
+    order.forEach(function(ch){ if(ch==='poster'||ch==='raw')return; if(caps[ch]){ addCaption(CHAN_LABEL[ch]||ch, String(caps[ch])); shown++; } });
+    if(!shown && caps.raw) addMsg(String(caps.raw),'ai');
+    var poster=caps.poster||{};
+    if(promoImg){
+      if(wantAi){
+        addMsg('🎨 กำลังแต่งรูปจากภาพที่แนบด้วย AI สักครู่นะครับ...','ai'); showTyping();
+        var payload={ prompt:text, imageBase64:(promoImg.dataURL.split(',')[1]||''), mime:(promoImg.dataURL.match(/^data:(.*?);/)||[])[1]||'image/jpeg' };
+        var ir; try{ ir=await awTimeout(api('genPromoImage',payload),60000); }catch(e){ ir={ok:false,error:'แต่งรูปนานเกินไป/เชื่อมต่อไม่ได้'}; }
+        hideTyping();
+        if(ir&&ir.ok&&ir.image){
+          var aiImg=new Image();
+          aiImg.onload=function(){ addPoster('ภาพแต่งด้วย AI (จากรูปที่แนบ)', ir.image); showPosterPicker(aiImg, poster, chans); };
+          aiImg.onerror=function(){ addMsg('โหลดภาพ AI ไม่ได้ ใช้รูปเดิมทำโปสเตอร์แทนนะครับ','err'); showPosterPicker(promoImg.imgEl, poster, chans); };
+          aiImg.src=ir.image;
+        } else { addMsg((ir&&ir.error)||'แต่งรูปไม่สำเร็จ ใช้รูปเดิมทำโปสเตอร์ได้','err'); showPosterPicker(promoImg.imgEl, poster, chans); }
+      } else { showPosterPicker(promoImg.imgEl, poster, chans); }
+    }
+  }catch(e){ hideTyping(); addMsg('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','err'); }
+  clearAtt();
+}
+function addCaption(label, txt){
+  var w=document.createElement('div'); w.className='cap-card';
+  var h=document.createElement('div'); h.className='cap-h'; h.textContent=label;
+  var b=document.createElement('div'); b.className='cap-b'; b.textContent=txt;
+  var btn=document.createElement('button'); btn.type='button'; btn.className='cap-copy'; btn.textContent='📋 คัดลอก';
+  btn.addEventListener('click', function(){
+    var done=function(){ btn.textContent='✓ คัดลอกแล้ว'; setTimeout(function(){btn.textContent='📋 คัดลอก';},1500); };
+    function fc(){ var ta=document.createElement('textarea'); ta.value=txt; ta.style.cssText='position:fixed;left:-9999px;'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');}catch(_){} ta.remove(); done(); }
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(fc); } else fc();
+  });
+  w.appendChild(h); w.appendChild(b); w.appendChild(btn);
+  msgsEl.appendChild(w); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+function addPoster(label, dataURL){
+  var w=document.createElement('div'); w.className='poster-card';
+  var im=document.createElement('img'); im.src=dataURL; im.alt='โปสเตอร์';
+  var pl=document.createElement('div'); pl.className='pl'; pl.textContent=label;
+  var a=document.createElement('a'); a.className='poster-dl'; a.href=dataURL; a.download='maru-promo.png'; a.textContent='⬇ ดาวน์โหลดรูป';
+  w.appendChild(im); w.appendChild(pl); w.appendChild(a);
+  msgsEl.appendChild(w); msgsEl.scrollTop=msgsEl.scrollHeight;
+}
+function showPosterPicker(imgEl, poster, chans){
+  var needSquare = chans.length===0 || chans.indexOf('facebook')>=0 || chans.indexOf('line')>=0 || chans.indexOf('instagram')>=0;
+  var needVert = chans.indexOf('tiktok')>=0;
+  if(!needSquare && !needVert) needSquare=true;
+  function withLogo(logo){
+    var w=document.createElement('div'); w.className='cap-card';
+    var h=document.createElement('div'); h.className='cap-h'; h.textContent='🎨 เลือกสไตล์โปสเตอร์ (กดได้หลายแบบ)';
+    w.appendChild(h);
+    var row=document.createElement('div'); row.style.cssText='display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;';
+    (window.MARU_POSTER_STYLES||[]).forEach(function(st){
+      var b=document.createElement('button'); b.type='button'; b.className='style-btn'; b.textContent=st.name;
+      b.addEventListener('click', function(){ b.classList.add('on'); renderStyle(imgEl, logo, poster, st.id, st.name, needSquare, needVert); });
+      row.appendChild(b);
+    });
+    w.appendChild(row); msgsEl.appendChild(w); msgsEl.scrollTop=msgsEl.scrollHeight;
+  }
+  if(window.maruEnsureLogo) window.maruEnsureLogo(withLogo); else withLogo(null);
+}
+function renderStyle(imgEl, logo, poster, styleId, styleName, needSquare, needVert){
+  function build(){
+    if(!window.maruDrawPoster) return;
+    if(needSquare){ try{ addPoster(styleName+' · 1:1', window.maruDrawPoster(imgEl, logo, 1080,1080, poster, styleId)); }catch(e){} }
+    if(needVert){ try{ addPoster(styleName+' · 9:16', window.maruDrawPoster(imgEl, logo, 1080,1920, poster, styleId)); }catch(e){} }
+  }
+  if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(build).catch(build); } else build();
+}
 function addMsg(text, cls){
   const h=$('hello'); if(h) h.remove();
   const d=document.createElement('div');
@@ -117,6 +270,10 @@ async function doSend(forceText){
   busy=true; sendBtn.disabled=true;
   let handedOff=false;
   if(typeof forceText!=='string'){ addMsg(text,'me'); inp.value=''; inp.style.height='auto'; }
+  if(promoImg || isPromo(text) || wantsAi(text)){
+    try{ await runPromo(text); } finally { busy=false; sendBtn.disabled=false; }
+    return;
+  }
   showTyping();
   try{
     let owner=''; try{ owner=sessionStorage.getItem('maruOwner')||''; }catch(e){}
