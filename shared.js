@@ -1163,6 +1163,14 @@ function maruAssistantMarkup(currentPage){
    + '.maru-cfg .cfg-mute{display:flex;align-items:center;gap:7px;font-size:13px;font-family:"Sarabun";color:#1A1A1A;}'
    + '.maru-msgs{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:9px;}'
    + '.maru-hi{text-align:center;color:#8A8170;font-size:13px;padding:10px;}'
+   + '.maru-hi .mh-av{width:92px;height:auto;display:block;margin:4px auto 8px;filter:drop-shadow(0 4px 9px rgba(120,86,0,.16));}'
+   + '.maru-hi .mh-t{font-family:"Kanit";font-weight:700;font-size:15px;color:#1A1A1A;}'
+   + '.maru-hi .mh-s{font-size:12px;color:#8A8170;margin-top:3px;}'
+   + '.maru-hi .mq{text-align:left;margin-top:14px;}'
+   + '.maru-hi .mqg{font-family:"Kanit";font-weight:700;font-size:11.5px;color:#7A7264;margin:11px 2px 6px;}'
+   + '.maru-hi .mqr{display:flex;flex-wrap:wrap;gap:6px;}'
+   + '.maru-hi .mqc{background:#fff;border:1.5px solid #ECE6D6;border-radius:12px;padding:7px 11px;font-size:12px;color:#1A1A1A;cursor:pointer;font-family:"Sarabun";font-weight:600;}'
+   + '.maru-hi .mqc:active{background:#FFF1CC;}'
    + '.maru-b{max-width:84%;padding:9px 12px;border-radius:14px;font-size:14px;line-height:1.5;white-space:pre-wrap;word-wrap:break-word;font-family:"Sarabun";}'
    + '.maru-b.me{align-self:flex-end;background:#FFC629;color:#1A1A1A;border-bottom-right-radius:4px;}'
    + '.maru-b.ai{align-self:flex-start;background:#fff;border:1px solid #ECE6D6;color:#1A1A1A;border-bottom-left-radius:4px;}'
@@ -1208,13 +1216,38 @@ function maruAssistantMarkup(currentPage){
    +     '<div class="cfg-row"><span>ความเร็ว</span><input type="range" id="maruRateSel" min="0.7" max="1.4" step="0.1"></div>'
    +     '<label class="cfg-mute"><input type="checkbox" id="maruMuteChk"> ปิดเสียงพูด</label>'
    +   '</div>'
-   +   '<div class="maru-msgs" id="maruMsgs"><div class="maru-hi">สวัสดีครับ 🐤 ถามหรือคุยเล่นได้เลย<br>อยากได้โพสต์ขายของ แนบรูป 📎 แล้วพิมพ์ เช่น "ทำโพสต์ ลด 20%"</div></div>'
+   +   '<div class="maru-msgs" id="maruMsgs"><div class="maru-hi" id="maruHi">'
+   +     '<img class="mh-av" src="Logo.png" alt="มารุ">'
+   +     '<div class="mh-t">สวัสดีครับ ผมผู้ช่วยมารุ 🐤</div>'
+   +     '<div class="mh-s">ถามข้อมูลร้าน คุยเล่น หรือแนบรูปทำโพสต์ขายของก็ได้</div>'
+   +     '<div class="mq">'
+   +       '<div class="mqg">💰 ยอดขาย</div><div class="mqr">'
+   +         '<button class="mqc" data-q="ยอดขายวันนี้รวมเท่าไหร่ แยกตามช่องทางด้วย">ยอดขายวันนี้</button>'
+   +         '<button class="mqc" data-q="ยอด Grab เดือนนี้รวมเท่าไหร่ ขอแยกรายวันด้วย">ยอด Grab เดือนนี้</button>'
+   +       '</div>'
+   +       '<div class="mqg">📦 สต๊อก</div><div class="mqr">'
+   +         '<button class="mqc" data-q="ตอนนี้มีสินค้าอะไรใกล้หมดหรือหมดสต๊อกบ้าง">ของใกล้หมด / หมด</button>'
+   +         '<button class="mqc" data-q="เบิกของล่าสุดรายการอะไร เมื่อไหร่ กี่โมง ใครเบิก">เบิกล่าสุด</button>'
+   +       '</div>'
+   +       '<div class="mqg">🧾 ค่าใช้จ่าย</div><div class="mqr">'
+   +         '<button class="mqc" data-q="ค่าใช้จ่ายเดือนนี้รวมเท่าไหร่ คิดเป็นกี่เปอร์เซ็นต์ของยอดขาย">ค่าใช้จ่ายเดือนนี้</button>'
+   +         '<button class="mqc" data-q="ขอดูรายการค่าใช้จ่ายล่าสุด 5 รายการ พร้อมวันที่และมีใบเสร็จไหม">รายการล่าสุด</button>'
+   +       '</div>'
+   +       '<div class="mqg">⏰ เข้างาน / เงินสด</div><div class="mqr">'
+   +         '<button class="mqc" data-q="วันนี้ใครเข้างานบ้าง กี่โมง อยู่ในเขตร้านไหม">ใครเข้างานวันนี้</button>'
+   +         '<button class="mqc" data-q="ตอนนี้เงินสดรอนำส่งเท่าไหร่ คำนวณจากอะไรบ้าง">เงินสดรอนำส่ง</button>'
+   +       '</div>'
+   +       '<div class="mqg">🎨 ทำโพสต์ / การตลาด</div><div class="mqr">'
+   +         '<button class="mqc" data-help="1">ℹ️ วิธีใช้โหมดการตลาด</button>'
+   +         '<button class="mqc" data-q="ทำโพสต์โปรโมชั่นลด 20% ลงเฟสบุ๊ก">ตัวอย่าง: โพสต์ลดราคา</button>'
+   +       '</div>'
+   +     '</div>'
+   +   '</div></div>'
    +   '<div class="maru-attchip" id="maruAttChip"><img id="maruAttThumb" alt=""><span class="nm" id="maruAttName">รูปแนบ</span><button class="rm" id="maruAttRm">ลบ</button></div>'
    +   '<div class="maru-in">'
    +     '<button class="maru-att" id="maruAtt" title="แนบรูปทำโพสต์">📎</button>'
    +     '<input type="file" accept="image/*" id="maruImgInput" style="display:none">'
-   +     '<button class="maru-mic" id="maruMic" title="พูด"><span class="maru-wave"><i></i><i></i><i></i><i></i></span></button>'
-   +     '<textarea id="maruInp" rows="1" placeholder="พิมพ์ หรือกดไมค์พูด..."></textarea>'
+   +     '<textarea id="maruInp" rows="1" placeholder="พิมพ์ข้อความ..."></textarea>'
    +     '<button class="maru-send" id="maruSend">➤</button>'
    +   '</div>'
    + '</div></div>';
@@ -1612,7 +1645,6 @@ function bindMaruAssistant(currentPage){
   var msgs = document.getElementById('maruMsgs');
   var inp = document.getElementById('maruInp');
   var sendB = document.getElementById('maruSend');
-  var micB = document.getElementById('maruMic');
   if(!fab || !ov) return;
 
   fab.addEventListener('click', function(){ ov.classList.add('show'); setTimeout(function(){ inp.focus(); }, 100); });
@@ -1686,27 +1718,25 @@ function bindMaruAssistant(currentPage){
   }
   if(attRm) attRm.addEventListener('click', clearAtt);
 
-  // ไมโครโฟน (ถ้าอุปกรณ์รองรับ)
-  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!SR){ micB.style.display='none'; }
-  else {
-    micB.addEventListener('click', function(){
-      if(micB.classList.contains('rec')){ try{ maruRec && maruRec.stop(); }catch(e){} return; }
-      try{
-        maruRec = new SR();
-        maruRec.lang='th-TH'; maruRec.interimResults=false; maruRec.maxAlternatives=1;
-        maruRec.onstart=function(){ micB.classList.add('rec'); };
-        maruRec.onend=function(){ micB.classList.remove('rec'); };
-        maruRec.onerror=function(){ micB.classList.remove('rec'); };
-        maruRec.onresult=function(ev){
-          var t = ev.results[0][0].transcript;
-          inp.value = t;
-          maruSend();
-        };
-        maruRec.start();
-      }catch(e){ toast('ใช้ไมค์ไม่ได้บนเครื่องนี้'); }
+  // ปุ่มคำถามด่วน (ให้สอดคล้องกับหน้าผู้ช่วยหลัก)
+  if(msgs){
+    msgs.addEventListener('click', function(e){
+      var c = (e.target && e.target.closest) ? e.target.closest('.mqc') : null;
+      if(!c) return;
+      if(c.getAttribute('data-help')){ maruShowMktHelp(); return; }
+      inp.value = c.getAttribute('data-q') || c.textContent; maruSend();
     });
   }
+  function maruShowMktHelp(){
+    var t = '🎨 โหมดการตลาด — วิธีใช้\n\n'
+      + '1) อยากได้โปสเตอร์ กดปุ่ม 📎 แนบรูปสินค้าก่อน (ถ้าอยากได้แค่แคปชั่น ไม่ต้องแนบก็ได้)\n'
+      + '2) พิมพ์สิ่งที่ต้องการ เช่น "ทำโพสต์ลด 20% ลงเฟส" หรือ "เขียนแคปชั่นเปิดเมนูใหม่ ลง LINE"\n'
+      + '   • ระบุช่องทางได้: เฟส / LINE / IG / TikTok\n'
+      + '3) มารุจะร่างแคปชั่นให้ กดคัดลอกได้ ถ้าแนบรูปจะมีสไตล์โปสเตอร์ 6 แบบให้เลือก + ดาวน์โหลด\n'
+      + '4) อยากให้ AI แต่งภาพ พิมพ์ "แต่งรูป" (เฉพาะจากรูปที่แนบ)';
+    maruAdd(t, 'ai');
+  }
+
 
   function maruAdd(text, cls){
     var hi = msgs.querySelector('.maru-hi'); if(hi) hi.remove();
