@@ -683,7 +683,13 @@ async function sbCloseDailyStock(p){
   if(!rows.length) return { ok:false, error:'ไม่มีรายการให้ปิดรอบ' };
   const res = await sbInsert('stock_daily', rows);
   if(!res.ok) return res;
-  return { ok:true, msg:'ปิดรอบแล้ว ' + rows.length + ' รายการ ✓ (LINE: รอ Edge Function)' };
+  var lineOk = false;
+  try{
+    var itemsArr = (T.items||[]).map(function(it){ return { id:it.item_id, name:it.name, category:it.category, unit:it.unit, minStock:Number(it.min_stock)||0, active:it.active!==false }; });
+    var lr = await maruNotifyLine([ maruBuildStockFlex(today, SB_STOCK_BRANCH, staff, itemsArr, rows) ]);
+    lineOk = !!(lr && lr.ok);
+  }catch(e){}
+  return { ok:true, msg:'ปิดรอบแล้ว ' + rows.length + ' รายการ ✓' + (lineOk ? ' · ส่ง LINE แล้ว' : '') };
 }
 
 // ---- ออดิทตรวจนับ + ปรับยอด ----
@@ -714,6 +720,7 @@ async function sbAddStockAudit(p){
   if(rcRows.length){ const r = await sbInsert('stock_receive', rcRows); if(!r.ok) return r; }
   if(wdRows.length){ const r = await sbInsert('stock_withdraw', wdRows); if(!r.ok) return r; }
   const adj = rcRows.length + wdRows.length;
+  try{ await maruNotifyLine([ maruBuildAuditFlex(today, SB_STOCK_BRANCH, staff, auditRows, adj) ]); }catch(e){}
   return { ok:true, msg:'บันทึกออดิท ' + auditRows.length + ' รายการ ✓' + (adj ? (' · ปรับยอด ' + adj) : '') };
 }
 
@@ -803,7 +810,14 @@ async function sbAddAttendLog(p){
     note:d.note || null, created_at:new Date().toISOString() };
   const res = await sbInsert('attendance', row);
   if(!res.ok) return res;
-  return { ok:true, msg:'บันทึก' + (d.type === 'out' ? 'ออกงาน' : 'เข้างาน') + 'แล้ว ✓', imgUrl:url, lineStatus:null };
+  var lineOk = false;
+  try{
+    var fd = { date:row.att_date, time:String(row.att_time||'').slice(0,5), type:row.type, name:name, nick:'',
+      branch:branch, address:row.address||'', imgUrl:url||'', inGeofence:row.in_geofence!==false, distance:Number(row.distance)||0 };
+    var lr = await maruNotifyLine([ maruBuildAttendFlex(fd) ]);
+    lineOk = !!(lr && lr.ok);
+  }catch(e){}
+  return { ok:true, msg:'บันทึก' + (d.type === 'out' ? 'ออกงาน' : 'เข้างาน') + 'แล้ว ✓', imgUrl:url, lineStatus:lineOk };
 }
 
 
@@ -2063,4 +2077,151 @@ function maruBuildDailyFlex(data, total, totalExp, recon){
       body:{ type:'box', layout:'vertical', spacing:'sm', paddingAll:'lg', contents:bodyContents },
       footer:footer, styles:{ footer:{ separator:true, separatorColor:'#F0E4C4' } } }
   };
+}
+
+
+// ----- Flex: ปิดร้าน (สรุปเบิกประจำวัน) -----
+function maruBuildStockFlex(date, branch, staff, itemsArr, dailyRows){
+  var dow = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  var dd = new Date(date + 'T00:00:00');
+  var itemsMap = {}; (itemsArr||[]).forEach(function(it){ itemsMap[it.id] = it; });
+  var byCat = { Waffle:[], KUFF:[], Drink:[], Other:[] }, wasteList = [], lowStock = [];
+  (dailyRows||[]).forEach(function(o){
+    var id = o.item_id, cat = itemsMap[id] ? itemsMap[id].category : 'Other';
+    var used = mwNum(o.used), waste = mwNum(o.waste), closing = mwNum(o.balance);
+    var minS = itemsMap[id] ? mwNum(itemsMap[id].minStock) : 0;
+    var unit = itemsMap[id] ? (itemsMap[id].unit || '') : '';
+    if(!byCat[cat]) cat = 'Other';
+    if(used > 0) byCat[cat].push({ name:o.item_name, used:used, unit:unit });
+    if(waste > 0) wasteList.push({ name:o.item_name, waste:waste, unit:unit });
+    if(minS > 0 && closing <= minS && itemsMap[id] && itemsMap[id].active) lowStock.push({ name:o.item_name, closing:closing, unit:unit, minS:minS });
+  });
+  var catIcons = { Waffle:'🧁', KUFF:'🥐', Drink:'🥤', Other:'📦' };
+  var catNames = { Waffle:'Waffle', KUFF:'KUFF', Drink:'Drink', Other:'อื่นๆ' };
+  var bodyContents = [], totalCount = 0;
+  ['Waffle','KUFF','Drink','Other'].forEach(function(cat){
+    if(!byCat[cat].length) return;
+    bodyContents.push({ type:'text', text:catIcons[cat] + ' ' + catNames[cat], size:'sm', weight:'bold', color:'#F37316', margin:(totalCount ? 'md' : 'none') });
+    byCat[cat].forEach(function(it){ totalCount++;
+      bodyContents.push({ type:'box', layout:'horizontal', spacing:'sm', contents:[
+        { type:'text', text:'  · ' + it.name, size:'sm', color:'#4B5563', flex:7, wrap:true },
+        { type:'text', text:it.used + ' ' + it.unit, size:'sm', color:'#1A1A1A', weight:'bold', align:'end', flex:3 }
+      ]});
+    });
+  });
+  if(totalCount === 0) bodyContents.push({ type:'text', text:'(ไม่มีการเบิก/ใช้ของในวันนี้)', size:'sm', color:'#9CA3AF', align:'center', margin:'md' });
+  if(wasteList.length){
+    bodyContents.push({ type:'separator', margin:'lg', color:'#F0E4C4' });
+    bodyContents.push({ type:'text', text:'🗑️ ของเสีย', size:'sm', weight:'bold', color:'#D02C2C', margin:'md' });
+    wasteList.forEach(function(w){
+      bodyContents.push({ type:'box', layout:'horizontal', spacing:'sm', contents:[
+        { type:'text', text:'  · ' + w.name, size:'sm', color:'#4B5563', flex:7, wrap:true },
+        { type:'text', text:w.waste + ' ' + w.unit, size:'sm', color:'#D02C2C', weight:'bold', align:'end', flex:3 }
+      ]});
+    });
+  }
+  if(lowStock.length){
+    var alertContents = [{ type:'text', text:'⚠️ ของใกล้หมด (' + lowStock.length + ' รายการ)', size:'sm', weight:'bold', color:'#92400E' }];
+    lowStock.slice(0,10).forEach(function(lo){
+      alertContents.push({ type:'box', layout:'horizontal', spacing:'sm', margin:'xs', contents:[
+        { type:'text', text:'· ' + lo.name, size:'xs', color:'#78350F', flex:7, wrap:true },
+        { type:'text', text:'เหลือ ' + lo.closing + ' ' + lo.unit, size:'xs', color:'#92400E', weight:'bold', align:'end', flex:4 }
+      ]});
+    });
+    if(lowStock.length > 10) alertContents.push({ type:'text', text:'…และอีก ' + (lowStock.length - 10) + ' รายการ', size:'xs', color:'#92400E', margin:'xs', align:'center' });
+    bodyContents.push({ type:'separator', margin:'lg', color:'#F0E4C4' });
+    bodyContents.push({ type:'box', layout:'vertical', margin:'md', paddingAll:'md', backgroundColor:'#FEF3C7', cornerRadius:'md', contents:alertContents });
+  }
+  return { type:'flex', altText:'🐤 Maru Waffle · สรุปเบิก ' + mwDateDM(date) + ' · ' + totalCount + ' รายการ',
+    contents:{ type:'bubble', size:'mega',
+      header:{ type:'box', layout:'vertical', spacing:'xs', backgroundColor:'#1A1A1A', paddingAll:'lg', contents:[
+        { type:'text', text:'🐤 Maru Waffle', size:'lg', weight:'bold', color:'#FFC629' },
+        { type:'text', text:'สรุปรายงานเบิกประจำวัน', size:'xs', color:'#D4CFC4' },
+        { type:'box', layout:'horizontal', margin:'sm', contents:[
+          { type:'text', text:'📅 ' + mwDateDM(date), size:'sm', color:'#FFFFFF', flex:5 },
+          { type:'text', text:'วัน' + dow[dd.getDay()], size:'sm', color:'#FFC629', align:'end', flex:4 }
+        ]}
+      ]},
+      body:{ type:'box', layout:'vertical', spacing:'sm', paddingAll:'lg', contents:bodyContents },
+      footer:{ type:'box', layout:'vertical', paddingAll:'sm', contents:[{ type:'text', text:'👤 ' + (staff || '-') + ' · ' + branch, size:'xxs', color:'#9CA3AF', align:'center' }] },
+      styles:{ footer:{ separator:true, separatorColor:'#F0E4C4' } } } };
+}
+
+// ----- Flex: ออดิทสต๊อก -----
+function maruBuildAuditFlex(date, branch, staff, auditRows, adjustedCount){
+  var dow = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  var dd = new Date(date + 'T00:00:00');
+  var disc = (auditRows||[]).filter(function(o){ return Math.abs(mwNum(o.diff)) > 0.01; });
+  var ok = (auditRows||[]).length - disc.length;
+  var body = [];
+  body.push({ type:'box', layout:'horizontal', spacing:'sm', margin:'none', contents:[
+    { type:'box', layout:'vertical', flex:1, backgroundColor:'#F0FDF4', paddingAll:'sm', cornerRadius:'md', contents:[
+      { type:'text', text:'ตรงระบบ', size:'xxs', color:'#15803D' },
+      { type:'text', text:String(ok), size:'xxl', weight:'bold', color:'#15803D' } ]},
+    { type:'box', layout:'vertical', flex:1, backgroundColor:'#FEF2F2', paddingAll:'sm', cornerRadius:'md', contents:[
+      { type:'text', text:'ส่วนต่าง', size:'xxs', color:'#B91C1C' },
+      { type:'text', text:String(disc.length), size:'xxl', weight:'bold', color:'#B91C1C' } ]}
+  ]});
+  if(disc.length){
+    body.push({ type:'separator', margin:'lg', color:'#F0E4C4' });
+    body.push({ type:'text', text:'⚠️ รายการที่ไม่ตรง', size:'sm', weight:'bold', color:'#B91C1C', margin:'md' });
+    disc.slice(0,10).forEach(function(o){
+      var diff = mwNum(o.diff), sign = diff > 0 ? '+' : '';
+      body.push({ type:'box', layout:'horizontal', spacing:'sm', margin:'xs', contents:[
+        { type:'text', text:'· ' + o.item_name, size:'sm', color:'#4B5563', flex:7, wrap:true },
+        { type:'text', text:sign + diff, size:'sm', color: diff > 0 ? '#15803D' : '#B91C1C', weight:'bold', align:'end', flex:3 }
+      ]});
+    });
+    if(disc.length > 10) body.push({ type:'text', text:'…และอีก ' + (disc.length - 10) + ' รายการ', size:'xs', color:'#9CA3AF', margin:'xs', align:'center' });
+  } else {
+    body.push({ type:'text', text:'✓ ทุกรายการตรงกับระบบ', size:'sm', color:'#15803D', align:'center', margin:'lg', weight:'bold' });
+  }
+  if(adjustedCount > 0){
+    body.push({ type:'separator', margin:'lg', color:'#F0E4C4' });
+    body.push({ type:'box', layout:'vertical', margin:'md', paddingAll:'sm', backgroundColor:'#FEF3C7', cornerRadius:'md',
+      contents:[{ type:'text', text:'🔧 ปรับคงเหลือ ' + adjustedCount + ' รายการ ตามที่นับจริง', size:'sm', weight:'bold', color:'#92400E', wrap:true }] });
+  }
+  return { type:'flex', altText:'🐤 Maru Waffle · ออดิทสต๊อก ' + mwDateDM(date) + ' · ส่วนต่าง ' + disc.length + ' รายการ',
+    contents:{ type:'bubble', size:'mega',
+      header:{ type:'box', layout:'vertical', spacing:'xs', backgroundColor:'#1A1A1A', paddingAll:'lg', contents:[
+        { type:'text', text:'🐤 Maru Waffle', size:'lg', weight:'bold', color:'#FFC629' },
+        { type:'text', text:'🔍 ออดิทสต๊อก', size:'xs', color:'#D4CFC4' },
+        { type:'box', layout:'horizontal', margin:'sm', contents:[
+          { type:'text', text:'📅 ' + mwDateDM(date), size:'sm', color:'#FFFFFF', flex:5 },
+          { type:'text', text:'วัน' + dow[dd.getDay()], size:'sm', color:'#FFC629', align:'end', flex:4 }
+        ]}
+      ]},
+      body:{ type:'box', layout:'vertical', spacing:'sm', paddingAll:'lg', contents:body },
+      footer:{ type:'box', layout:'vertical', paddingAll:'sm', contents:[{ type:'text', text:'👤 ' + (staff || '-') + ' · ' + branch + ' · ตรวจ ' + (auditRows||[]).length + ' รายการ', size:'xxs', color:'#9CA3AF', align:'center' }] },
+      styles:{ footer:{ separator:true, separatorColor:'#F0E4C4' } } } };
+}
+
+// ----- Flex: เข้า-ออกงาน -----
+function maruBuildAttendFlex(d){
+  var dow = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  var dt = new Date(d.date + 'T00:00:00');
+  var typeLabel = d.type === 'in' ? '🟢 เข้างาน' : '🔴 ออกงาน';
+  var typeColor = d.type === 'in' ? '#15803D' : '#D02C2C';
+  var geofenceLabel = d.inGeofence ? '✓ ในเขตร้าน' : '⚠️ นอกเขตร้าน (' + Math.round(d.distance) + ' m)';
+  var geofenceColor = d.inGeofence ? '#15803D' : '#F37316';
+  var bubble = { type:'bubble', size:'mega',
+    header:{ type:'box', layout:'vertical', spacing:'xs', backgroundColor:'#1A1A1A', paddingAll:'lg', contents:[
+      { type:'text', text:'🐤 Maru Waffle', size:'lg', weight:'bold', color:'#FFC629' },
+      { type:'text', text:'⏰ บันทึกเข้า-ออกงาน', size:'xs', color:'#D4CFC4' },
+      { type:'box', layout:'horizontal', margin:'sm', contents:[
+        { type:'text', text:'📅 ' + mwDateDM(d.date), size:'sm', color:'#FFFFFF', flex:5 },
+        { type:'text', text:'วัน' + dow[dt.getDay()], size:'sm', color:'#FFC629', align:'end', flex:4 }
+      ]}
+    ]},
+    body:{ type:'box', layout:'vertical', spacing:'md', paddingAll:'lg', contents:[
+      { type:'text', text:typeLabel + ' · ' + d.time, size:'xl', weight:'bold', color:typeColor, align:'center' },
+      { type:'text', text:'👤 ' + d.name + (d.nick ? ' (' + d.nick + ')' : ''), size:'md', weight:'bold', color:'#1A1A1A', align:'center' },
+      { type:'separator', color:'#F0E4C4' },
+      { type:'text', text:geofenceLabel, size:'sm', color:geofenceColor, weight:'bold' },
+      { type:'text', text:'📍 ' + (d.address || '-'), size:'xs', color:'#6B5F4A', wrap:true }
+    ]},
+    footer:{ type:'box', layout:'vertical', paddingAll:'sm', contents:[{ type:'text', text:'🏪 ' + (d.branch || '-'), size:'xxs', color:'#9CA3AF', align:'center' }] },
+    styles:{ footer:{ separator:true, separatorColor:'#F0E4C4' } } };
+  if(d.imgUrl) bubble.hero = { type:'image', url:d.imgUrl, size:'full', aspectRatio:'1:1', aspectMode:'cover', action:{ type:'uri', uri:d.imgUrl } };
+  return { type:'flex', altText:'🐤 ' + (d.type === 'in' ? 'เข้างาน' : 'ออกงาน') + ' · ' + d.name + ' · ' + d.time, contents:bubble };
 }
