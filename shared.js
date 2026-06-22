@@ -892,8 +892,9 @@ async function sbCheckStockItemUsage(p){
 }
 
 // ===== ระบบเงินสดนำส่ง (cash remittance) =====
-async function sbGetRemitPending(){
-  var today = sbFmtD(new Date());
+async function sbGetRemitPending(p){
+  var endDate = (p && (p.endDate || p.end)) || null;
+  var today = endDate || sbFmtD(new Date());
   var remits = await sbFetch('cash_remittance?select=period_end&order=period_end.desc&limit=1');
   var start = null;
   if(remits && remits.length && remits[0].period_end){ var d=new Date(remits[0].period_end+'T00:00:00'); d.setDate(d.getDate()+1); start=sbFmtD(d); }
@@ -917,7 +918,7 @@ async function sbGetRemitPending(){
 async function sbSubmitRemit(p){
   var d=(p&&p.data)||{};
   if(!d.submittedBy || !String(d.submittedBy).trim()) return { ok:false, error:'กรุณากรอกชื่อผู้นำส่ง' };
-  var pend = await sbGetRemitPending();
+  var pend = await sbGetRemitPending({ endDate: (d.periodEnd || null) });
   if(!pend.days.length) return { ok:false, error:'ยังไม่มีวันที่ปิดรอบให้นำส่งในรอบนี้' };
   var slip='';
   try{ if(d.slip && d.slip.base64) slip = await sbUploadImage('remit-slips', d.slip); }
@@ -1010,6 +1011,8 @@ const ICONS = {
   check:    ICON_S+'<polyline points="20 6 9 17 4 12"/></svg>',
   camera:   ICON_S+'<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
   image:    ICON_S+'<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>',
+  chat:     ICON_S+'<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>',
+  book:     ICON_S+'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
 };
 
 // ---- Render icons on data-icon attribute ----
@@ -1037,35 +1040,35 @@ function bindSidebar(){
 // ---- Build standard sidebar (เรียกในทุกหน้า — มาร์ค active ตาม attr current) ----
 function buildSidebar(currentPage){
   const items = [
-    { page:'home',           href:'index.html',           img:'ic-overview.png',     label:'หน้าแรก' },
+    { page:'home',           href:'index.html',           icon:'dash',     label:'หน้าแรก' },
     { group: '⭐ ทำประจำวัน' },
-    { page:'report',         href:'records.html#report',  img:'ic-record.png',       label:'บันทึกรายงานสิ้นวัน' },
-    { page:'bizexp',         href:'records.html#bizexp',  img:'ic-expense.png',      label:'บันทึกค่าใช้จ่าย' },
-    { page:'stockWithdraw',  href:'stock-withdraw.html',  img:'ic-overview.png',     label:'เบิกของ' },
-    { page:'stockReceive',   href:'stock-receive.html',   img:'ic-receive.png',      label:'รับของเข้า' },
-    { page:'attend',         href:'attend.html',          img:'ic-attend.png',       label:'บันทึกเข้างาน' },
-    { page:'stockClose',     href:'stock-close.html',     img:'ic-overview.png',     label:'ปิดร้าน (สรุปสต๊อก)' },
+    { page:'report',         href:'records.html#report',  icon:'edit',       label:'บันทึกรายงานสิ้นวัน' },
+    { page:'bizexp',         href:'records.html#bizexp',  icon:'receipt',      label:'บันทึกค่าใช้จ่าย' },
+    { page:'stockWithdraw',  href:'stock-withdraw.html',  icon:'edit',     label:'เบิกของ' },
+    { page:'stockReceive',   href:'stock-receive.html',   icon:'receipt',      label:'รับของเข้า' },
+    { page:'attend',         href:'attend.html',          icon:'check',       label:'บันทึกเข้างาน' },
+    { page:'stockClose',     href:'stock-close.html',     icon:'check',     label:'ปิดร้าน (สรุปสต๊อก)' },
     { group: '📊 รายงาน' },
-    { page:'dash',           href:'records.html#dash',    img:'ic-sales.png',        label:'แดชบอร์ดยอดขาย' },
-    { page:'expreport',      href:'expenses-report.html', img:'ic-expense.png',      label:'รายงานสรุปค่าใช้จ่าย' },
-    { page:'stockDashboard', href:'stock-dashboard.html', img:'ic-overview.png',     label:'แดชบอร์ดสต๊อก' },
-    { page:'stockView',      href:'stock-view.html',      img:'ic-audit.png',        label:'ตรวจสต๊อก' },
-    { page:'attendReport',   href:'attend-report.html',   img:'ic-attendreport.png', label:'รายงานเข้า-ออกงาน' },
-    { page:'stockAuditReport', href:'stock-audit-report.html', img:'ic-audit.png',   label:'ประวัติออดิท' },
+    { page:'dash',           href:'records.html#dash',    icon:'trend',        label:'แดชบอร์ดยอดขาย' },
+    { page:'expreport',      href:'expenses-report.html', icon:'trend',      label:'รายงานสรุปค่าใช้จ่าย' },
+    { page:'stockDashboard', href:'stock-dashboard.html', icon:'dash',     label:'แดชบอร์ดสต๊อก' },
+    { page:'stockView',      href:'stock-view.html',      icon:'store',        label:'ตรวจสต๊อก' },
+    { page:'attendReport',   href:'attend-report.html',   icon:'trend', label:'รายงานเข้า-ออกงาน' },
+    { page:'stockAuditReport', href:'stock-audit-report.html', icon:'check',   label:'ประวัติออดิท' },
     { group: '⚙️ จัดการ / ตั้งค่า' },
-    { page:'stockManage',    href:'stock-manage.html',    img:'ic-overview.png',     label:'จัดการรายการสต๊อก' },
-    { page:'stockAudit',     href:'stock-audit.html',     img:'ic-audit.png',        label:'ออดิทสต๊อก' },
-    { page:'attendSetup',    href:'attend-setup.html',    img:'ic-branch.png',       label:'จัดการพนักงาน/สาขา' },
-    { page:'payments',       href:'payments.html',        img:'ic-finance.png',      label:'การจ่ายเงิน' },
-    { page:'cashRemit',      href:'cash-remit.html',      img:'ic-finance.png',      label:'เงินสดนำส่ง' },
+    { page:'stockManage',    href:'stock-manage.html',    icon:'edit',     label:'จัดการรายการสต๊อก' },
+    { page:'stockAudit',     href:'stock-audit.html',     icon:'check',        label:'ออดิทสต๊อก' },
+    { page:'attendSetup',    href:'attend-setup.html',    icon:'edit',       label:'จัดการพนักงาน/สาขา' },
+    { page:'payments',       href:'payments.html',        icon:'receipt',      label:'การจ่ายเงิน' },
+    { page:'cashRemit',      href:'cash-remit.html',      icon:'receipt',      label:'เงินสดนำส่ง' },
     { group: '🐤 อื่นๆ' },
-    { page:'assistant',      href:'assistant.html',       img:'icon-faq.png',        label:'ผู้ช่วยมารุ' },
-    { page:'manual',         href:'manual.html',          img:'icon-contact.png',    label:'คู่มือการใช้งาน' },
+    { page:'assistant',      href:'assistant.html',       icon:'chat',        label:'ผู้ช่วยมารุ' },
+    { page:'manual',         href:'manual.html',          icon:'book',    label:'คู่มือการใช้งาน' },
   ];
   return items.map(function(it){
     if(it.group) return '<div class="sb-group">'+it.group+'</div>';
     const active = it.page === currentPage ? ' active' : '';
-    return '<a class="sb-item'+active+'" href="'+it.href+'"><img class="si-img" src="'+it.img+'" alt="">'+it.label+'</a>';
+    return '<a class="sb-item'+active+'" href="'+it.href+'"><span class="si" data-icon="'+it.icon+'"></span>'+it.label+'</a>';
   }).join('');
 }
 
