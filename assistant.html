@@ -63,6 +63,15 @@
 .poster-card img{max-width:100%;border-radius:10px;display:block;margin:0 auto;}
 .poster-card .pl{font-size:12px;color:var(--ink-2);margin:7px 0;font-family:'Kanit';font-weight:600;}
 .poster-dl{display:inline-block;background:#FFC629;color:#1A1A1A;font-family:'Kanit';font-weight:700;font-size:13px;padding:8px 16px;border-radius:10px;text-decoration:none;}
+.act-card{align-self:stretch;background:#fff;border:1.5px solid #F2D58A;border-radius:14px;padding:12px 14px;box-shadow:0 2px 8px rgba(120,86,0,.1);}
+.act-card .ac-h{font-family:'Kanit';font-weight:700;font-size:14px;color:#1A1A1A;margin-bottom:6px;}
+.act-card .ac-b{font-size:14px;color:#1A1A1A;margin-bottom:8px;}
+.act-card input{width:100%;box-sizing:border-box;border:1.5px solid #E8DFC4;border-radius:10px;padding:9px 11px;font-family:'Sarabun';font-size:14px;margin-bottom:9px;}
+.act-card .ac-btns{display:flex;gap:8px;}
+.act-card .ac-btns button{flex:1;border:0;border-radius:10px;padding:10px;font-family:'Kanit';font-weight:700;font-size:14px;cursor:pointer;}
+.act-card .ac-ok{background:#15803D;color:#fff;}
+.act-card .ac-cancel{background:#F2EEDD;color:#5A5247;}
+.act-card .ac-msg{font-size:12.5px;margin-top:7px;}
 .note{font-size:11px;color:var(--ink-2);text-align:center;padding:2px 10px 6px;}
 </style>
 </head>
@@ -268,6 +277,26 @@ function renderStyle(imgEl, logo, poster, styleId, styleName, needSquare, needVe
   }
   if(document.fonts&&document.fonts.ready){ document.fonts.ready.then(build).catch(build); } else build();
 }
+function renderActionCard(pa){
+  var kindTxt = pa.kind === 'receive' ? 'รับเข้า' : 'เบิก';
+  function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  var w=document.createElement('div'); w.className='act-card';
+  w.innerHTML='<div class="ac-h">📋 ยืนยัน'+kindTxt+'</div>'
+    +'<div class="ac-b"><b>'+esc(pa.item_name)+'</b> · จำนวน '+esc(pa.qty)+' '+esc(pa.unit||'')+'</div>'
+    +'<input class="ac-name" type="text" placeholder="ชื่อผู้ทำรายการ" value="'+esc(pa.recordedBy||'')+'">'
+    +'<div class="ac-btns"><button class="ac-ok">✓ ยืนยัน'+kindTxt+'</button><button class="ac-cancel">ยกเลิก</button></div>'
+    +'<div class="ac-msg"></div>';
+  msgsEl.appendChild(w); msgsEl.scrollTop=msgsEl.scrollHeight;
+  var nameInp=w.querySelector('.ac-name'), okBtn=w.querySelector('.ac-ok'), cancelBtn=w.querySelector('.ac-cancel'), msg=w.querySelector('.ac-msg'), btns=w.querySelector('.ac-btns');
+  cancelBtn.addEventListener('click', function(){ btns.style.display='none'; msg.style.color='#9A8C6E'; msg.textContent='ยกเลิกแล้ว'; });
+  okBtn.addEventListener('click', function(){
+    var by=(nameInp.value||'').trim(); if(!by){ msg.style.color='#B91C1C'; msg.textContent='กรุณากรอกชื่อผู้ทำรายการ'; return; }
+    okBtn.disabled=true; cancelBtn.disabled=true; okBtn.textContent='กำลังบันทึก...';
+    api('execStockWrite', { kind:pa.kind, itemId:pa.item_id, qty:pa.qty, recordedBy:by, note:pa.note||'' })
+      .then(function(res){ if(res&&res.ok){ btns.style.display='none'; msg.style.color='#15803D'; msg.textContent='✓ '+(res.msg||'บันทึกแล้ว'); } else { okBtn.disabled=false; cancelBtn.disabled=false; okBtn.textContent='✓ ยืนยัน'+kindTxt; msg.style.color='#B91C1C'; msg.textContent=(res&&res.error)||'บันทึกไม่สำเร็จ'; } })
+      .catch(function(e){ okBtn.disabled=false; cancelBtn.disabled=false; okBtn.textContent='✓ ยืนยัน'+kindTxt; msg.style.color='#B91C1C'; msg.textContent='ผิดพลาด: '+(e.message||e); });
+  });
+}
 function addMsg(text, cls){
   const h=$('hello'); if(h) h.remove();
   const d=document.createElement('div');
@@ -325,6 +354,7 @@ async function doSend(forceText){
       history.push({role:'user',text:text});
       history.push({role:'model',text:r.reply});
       if(history.length>24) history=history.slice(-24);
+      if(r.pendingAction){ renderActionCard(r.pendingAction); }
     }else{
       addMsg(r.error||'ขอโทษครับ ตอบไม่ได้ตอนนี้','err');
     }
