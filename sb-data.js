@@ -19,6 +19,147 @@
   ];
   const SB_DOW = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
   const H = { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY };
+  const EDGE_URL = SB_URL + '/functions/v1/secure-api';
+
+  // ===== LINE: Flex รายงานสิ้นวัน + ส่งผ่าน Edge (self-contained — records ไม่โหลด shared.js) =====
+function mwMoney(n){ return Math.round(Number(n) || 0).toLocaleString('en-US'); }
+function mwNum(v){ return Number(v) || 0; }
+function mwDateDM(s){ var p = String(s).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
+function mwNowStr(){
+  try{
+    var parts = new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Bangkok', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(new Date());
+    var o = {}; parts.forEach(function(p){ o[p.type]=p.value; });
+    return o.day + '/' + o.month + '/' + o.year + ' ' + o.hour + ':' + o.minute;
+  }catch(e){ return ''; }
+}
+
+// ส่งข้อความ Flex เข้า LINE (fire-and-forget ปลอดภัย — ไม่ throw)
+async function maruNotifyLine(messages){
+  // ยิง Edge ตรง ๆ ไม่ผ่าน api() — เพราะบางหน้า (records) เขียนทับ api แล้วไม่รู้จัก EDGE_ACTIONS
+  try{
+    if(!messages || !messages.length) return { ok:false };
+    const res = await fetch(EDGE_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:SB_KEY },
+      body: JSON.stringify({ action:'notifyLine', messages: messages })
+    });
+    if(!res.ok) return { ok:false, error:'Edge HTTP ' + res.status };
+    return await res.json();
+  }catch(e){ return { ok:false, error:String(e && e.message || e) }; }
+}
+
+// Flex: รายงานสรุปยอดขายสิ้นวัน (เหมือนของเดิมใน Apps Script)
+function maruBuildDailyFlex(data, total, totalExp, recon){
+  var ch = data.sales || {};
+  var dow = ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  var d = new Date(data.date + 'T00:00:00');
+  var net = total - totalExp;
+
+  function row(label, amount, opts){
+    opts = opts || {};
+    return { type:'box', layout:'horizontal', spacing:'sm', contents:[
+      { type:'text', text:label, size:'sm', color: opts.muted ? '#9CA3AF' : '#4B5563', flex:5 },
+      { type:'text', text:'฿' + mwMoney(amount), size:'sm', color: opts.color || '#111827',
+        weight: opts.bold ? 'bold' : 'regular', align:'end', flex:4 }
+    ]};
+  }
+  function sectionHeader(emoji, title, accent){
+    return { type:'box', layout:'horizontal', spacing:'sm', margin:'md', contents:[
+      { type:'text', text: emoji + ' ' + title, size:'sm', weight:'bold', color: accent || '#1A1A1A', flex:0 }
+    ]};
+  }
+  function separator(){ return { type:'separator', margin:'md', color:'#F0E4C4' }; }
+
+  var header = { type:'box', layout:'vertical', spacing:'xs', backgroundColor:'#1A1A1A', paddingAll:'lg', contents:[
+    { type:'text', text:'🐤 Maru Waffle', size:'lg', weight:'bold', color:'#FFC629' },
+    { type:'text', text:'รายงานสรุปยอดขายสิ้นวัน', size:'xs', color:'#D4CFC4' },
+    { type:'box', layout:'horizontal', margin:'sm', contents:[
+      { type:'text', text:'📅 ' + mwDateDM(data.date), size:'sm', color:'#FFFFFF', flex:5 },
+      { type:'text', text:'วัน' + dow[d.getDay()], size:'sm', color:'#FFC629', align:'end', flex:4 }
+    ]}
+  ]};
+
+  var bodyContents = [];
+  bodyContents.push({ type:'box', layout:'vertical', spacing:'none', contents:[
+    { type:'text', text:'ยอดขายรวม', size:'xs', color:'#9CA3AF' },
+    { type:'text', text:'฿' + mwMoney(total), size:'3xl', weight:'bold', color:'#D97706' }
+  ]});
+
+  bodyContents.push(separator());
+  bodyContents.push(sectionHeader('🏪', 'ยอดขายหน้าร้าน', '#F37316'));
+  bodyContents.push(row('เงินสด', ch.cash));
+  bodyContents.push(row('เงินโอน', ch.transfer));
+  bodyContents.push(row('ไทยช่วยไทย', ch.thaihelp));
+
+  bodyContents.push(separator());
+  bodyContents.push(sectionHeader('🛵', 'ยอดขาย Delivery', '#1B98A4'));
+  bodyContents.push(row('LineMan', ch.lineman));
+  bodyContents.push(row('Grab', ch.grab));
+  bodyContents.push(row('ShopeeFood', ch.shopee));
+  bodyContents.push(row('Robinhood', ch.robinhood));
+
+  bodyContents.push(separator());
+  bodyContents.push(row('🧾 ค่าใช้จ่ายรวม', totalExp, { color:'#D02C2C' }));
+  bodyContents.push({ type:'box', layout:'horizontal', spacing:'sm', margin:'sm', paddingAll:'sm',
+    backgroundColor: net >= 0 ? '#ECFDF5' : '#FEF2F2', cornerRadius:'md', contents:[
+      { type:'text', text:'✨ กำไรสุทธิ', size:'md', weight:'bold', color:'#1A1A1A', flex:5 },
+      { type:'text', text:'฿' + mwMoney(net), size:'lg', weight:'bold', color: net >= 0 ? '#059669' : '#DC2626', align:'end', flex:4 }
+  ]});
+
+  if(recon && (mwNum(recon.openingCash) || mwNum(recon.actualCash))){
+    var open = mwNum(recon.openingCash), cashIn = mwNum(recon.cashIn), refund = mwNum(recon.refund);
+    var cashSales = mwNum(ch.cash);
+    var expected = open + cashSales + cashIn - refund - totalExp;
+    var actual = mwNum(recon.actualCash);
+    var diff = actual - expected;
+    bodyContents.push(separator());
+    bodyContents.push(sectionHeader('💵', 'ปิดรอบเงินสด', '#1E9E50'));
+    bodyContents.push(row('เงินสดเริ่มต้น', open, { muted:true }));
+    if(cashIn) bodyContents.push(row('เงินเข้า', cashIn, { muted:true }));
+    if(refund) bodyContents.push(row('คืนเงิน', -refund, { muted:true }));
+    bodyContents.push(row('เงินที่ควรมี', expected, { bold:true }));
+    bodyContents.push(row('เงินจริงในลิ้นชัก', actual, { bold:true }));
+    var diffLabel, diffColor, diffBg;
+    if(diff === 0){ diffLabel='พอดี ✓'; diffColor='#059669'; diffBg='#ECFDF5'; }
+    else if(diff > 0){ diffLabel='เกิน ฿' + mwMoney(diff); diffColor='#059669'; diffBg='#ECFDF5'; }
+    else { diffLabel='ขาด ฿' + mwMoney(Math.abs(diff)) + ' ⚠️'; diffColor='#DC2626'; diffBg='#FEF2F2'; }
+    bodyContents.push({ type:'box', layout:'horizontal', spacing:'sm', margin:'sm', paddingAll:'sm',
+      backgroundColor:diffBg, cornerRadius:'md', contents:[
+        { type:'text', text:'ส่วนต่าง', size:'sm', weight:'bold', color:'#1A1A1A', flex:4 },
+        { type:'text', text:diffLabel, size:'sm', weight:'bold', color:diffColor, align:'end', flex:5 }
+    ]});
+  }
+
+  if((recon && recon.closeStaff) || data.note){
+    bodyContents.push(separator());
+    if(recon && recon.closeStaff){
+      bodyContents.push({ type:'box', layout:'horizontal', spacing:'sm', contents:[
+        { type:'text', text:'👤 พนักงานปิดรอบ', size:'xs', color:'#9CA3AF', flex:5 },
+        { type:'text', text:recon.closeStaff, size:'sm', weight:'bold', color:'#1A1A1A', align:'end', flex:5, wrap:true }
+      ]});
+    }
+    if(data.note){
+      bodyContents.push({ type:'box', layout:'vertical', spacing:'xs', margin:'sm', paddingAll:'sm',
+        backgroundColor:'#FFF7E0', cornerRadius:'md', contents:[
+          { type:'text', text:'📝 หมายเหตุประจำวัน', size:'xs', color:'#8A6A00', weight:'bold' },
+          { type:'text', text:String(data.note), size:'sm', color:'#1A1A1A', wrap:true }
+      ]});
+    }
+  }
+
+  var footer = { type:'box', layout:'vertical', paddingAll:'sm', contents:[
+    { type:'text', text:'บันทึกอัตโนมัติ · ' + mwNowStr(), size:'xxs', color:'#9CA3AF', align:'center' }
+  ]};
+
+  return {
+    type:'flex',
+    altText:'🐤 Maru Waffle · รายงานสิ้นวัน ' + mwDateDM(data.date) + ' · ยอดขายรวม ฿' + mwMoney(total),
+    contents:{ type:'bubble', size:'mega', header:header,
+      body:{ type:'box', layout:'vertical', spacing:'sm', paddingAll:'lg', contents:bodyContents },
+      footer:footer, styles:{ footer:{ separator:true, separatorColor:'#F0E4C4' } } }
+  };
+}
+
 
   // ย่อ/บีบรูปก่อนอัป (records.html ใช้ตัวนี้ทำพรีวิว+อัป) — เผื่อหน้านี้ไม่ได้โหลด shared.js
   window.maruCompressImage = function (file, maxDim, quality) {
@@ -196,15 +337,11 @@
       // ส่งแจ้งเตือนเข้า LINE (Flex รายงานสิ้นวัน) ผ่าน Edge — ไม่บล็อกถ้าพลาด
       var lineMsg = 'บันทึกรายงานสิ้นวันแล้ว ✓';
       try {
-        if (!window.maruBuildDailyFlex || !window.maruNotifyLine) {
-          lineMsg = 'บันทึกแล้ว ✓ · LINE ข้าม (shared.js เก่า — ปิด-เปิดแอป)';
-        } else {
-          var flex = window.maruBuildDailyFlex({ date: date, sales: sales, note: data.note || '' }, total, posSum, recon);
-          var lr = await window.maruNotifyLine([flex]);
-          console.log('[LINE notify result]', lr);
-          if (lr && lr.ok) lineMsg = 'บันทึก + ส่งเข้า LINE แล้ว ✓ (' + date + ')';
-          else lineMsg = 'บันทึกแล้ว ✓ · LINE ไม่สำเร็จ: ' + (lr && (lr.error || lr.body || ('HTTP ' + lr.status)) || '?');
-        }
+        var flex = maruBuildDailyFlex({ date: date, sales: sales, note: data.note || '' }, total, posSum, recon);
+        var lr = await maruNotifyLine([flex]);
+        console.log('[LINE notify result]', lr);
+        if (lr && lr.ok) lineMsg = 'บันทึก + ส่งเข้า LINE แล้ว ✓ (' + date + ')';
+        else lineMsg = 'บันทึกแล้ว ✓ · LINE ไม่สำเร็จ: ' + (lr && (lr.error || lr.body || ('HTTP ' + lr.status)) || '?');
       } catch (e) { lineMsg = 'บันทึกแล้ว ✓ · LINE error: ' + String(e && e.message || e); }
       return { ok: true, msg: lineMsg };
     } catch (e) { return { ok: false, error: String(e.message || e) }; }
