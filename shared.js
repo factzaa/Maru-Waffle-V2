@@ -1964,9 +1964,16 @@ function mwNowStr(){
 
 // ส่งข้อความ Flex เข้า LINE (fire-and-forget ปลอดภัย — ไม่ throw)
 async function maruNotifyLine(messages){
+  // ยิง Edge ตรง ๆ ไม่ผ่าน api() — เพราะบางหน้า (records) เขียนทับ api แล้วไม่รู้จัก EDGE_ACTIONS
   try{
     if(!messages || !messages.length) return { ok:false };
-    return await api('notifyLine', { messages: messages });
+    const res = await fetch(EDGE_URL, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', apikey:SB_KEY },
+      body: JSON.stringify({ action:'notifyLine', messages: messages })
+    });
+    if(!res.ok) return { ok:false, error:'Edge HTTP ' + res.status };
+    return await res.json();
   }catch(e){ return { ok:false, error:String(e && e.message || e) }; }
 }
 
