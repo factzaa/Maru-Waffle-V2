@@ -196,13 +196,16 @@
       // ส่งแจ้งเตือนเข้า LINE (Flex รายงานสิ้นวัน) ผ่าน Edge — ไม่บล็อกถ้าพลาด
       var lineMsg = 'บันทึกรายงานสิ้นวันแล้ว ✓';
       try {
-        if (window.maruBuildDailyFlex && window.maruNotifyLine) {
+        if (!window.maruBuildDailyFlex || !window.maruNotifyLine) {
+          lineMsg = 'บันทึกแล้ว ✓ · LINE ข้าม (shared.js เก่า — ปิด-เปิดแอป)';
+        } else {
           var flex = window.maruBuildDailyFlex({ date: date, sales: sales, note: data.note || '' }, total, posSum, recon);
           var lr = await window.maruNotifyLine([flex]);
+          console.log('[LINE notify result]', lr);
           if (lr && lr.ok) lineMsg = 'บันทึก + ส่งเข้า LINE แล้ว ✓ (' + date + ')';
-          else lineMsg = 'บันทึกแล้ว ✓ · ส่ง LINE ไม่สำเร็จ';
+          else lineMsg = 'บันทึกแล้ว ✓ · LINE ไม่สำเร็จ: ' + (lr && (lr.error || lr.body || ('HTTP ' + lr.status)) || '?');
         }
-      } catch (e) {}
+      } catch (e) { lineMsg = 'บันทึกแล้ว ✓ · LINE error: ' + String(e && e.message || e); }
       return { ok: true, msg: lineMsg };
     } catch (e) { return { ok: false, error: String(e.message || e) }; }
   }
