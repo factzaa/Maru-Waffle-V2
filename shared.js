@@ -1260,6 +1260,7 @@ function maruAssistantMarkup(currentPage){
    +     '<div class="cfg-row"><span>ความเร็ว</span><input type="range" id="maruRateSel" min="0.7" max="1.4" step="0.1"></div>'
    +     '<label class="cfg-mute"><input type="checkbox" id="maruMuteChk"> ปิดเสียงพูด</label>'
    +     '<label class="cfg-mute"><input type="checkbox" id="maruGemVoiceChk"> เสียง Gemini (เพราะกว่า · ช้านิด)</label>'
+   +     '<div class="cfg-row"><span>โทนเสียง Gemini</span><select id="maruGemVoiceSel"><option value="Leda">สดใส วัยรุ่น (Leda)</option><option value="Puck">กระฉับกระเฉง (Puck)</option><option value="Zephyr">สดใส (Zephyr)</option><option value="Fenrir">มีพลัง (Fenrir)</option><option value="Sadachbia">มีชีวิตชีวา (Sadachbia)</option><option value="Aoede">สบายๆ ผู้ใหญ่ (Aoede)</option></select></div>'
    +   '</div>'
    +   '<div class="maru-msgs" id="maruMsgs"><div class="maru-hi" id="maruHi">'
    +     '<img class="mh-av" src="Logo.png" alt="มารุ">'
@@ -1425,7 +1426,7 @@ async function maruTtsGemini(text, onReady){
   var safety=setTimeout(reveal, 6000);   // กันค้าง: ถ้าเสียงช้ามาก ก็โชว์ข้อความก่อนได้
   try{
     if(maruTtsAudio){ try{ maruTtsAudio.pause(); }catch(e){} maruTtsAudio=null; }
-    var voice = localStorage.getItem('maruGemVoice') || 'Aoede';
+    var voice = localStorage.getItem('maruGemVoice') || 'Leda';
     var res = await fetch(EDGE_URL, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY }, body: JSON.stringify({ action:'ttsSpeak', text:text, voice:voice }) });
     if(!res.ok){ clearTimeout(safety); reveal(); maruDeviceSpeak(text); return; }
     var d = await res.json();
@@ -1758,6 +1759,8 @@ function bindMaruAssistant(currentPage){
   if(muteChk) muteChk.checked = localStorage.getItem('maruMute') === '1';
   var gemChk = document.getElementById('maruGemVoiceChk');
   if(gemChk){ gemChk.checked = localStorage.getItem('maruGeminiVoice') === '1'; gemChk.addEventListener('change', function(){ localStorage.setItem('maruGeminiVoice', gemChk.checked ? '1' : '0'); }); }
+  var gemVoiceSel = document.getElementById('maruGemVoiceSel');
+  if(gemVoiceSel){ gemVoiceSel.value = localStorage.getItem('maruGemVoice') || 'Leda'; gemVoiceSel.addEventListener('change', function(){ localStorage.setItem('maruGemVoice', gemVoiceSel.value); maruTtsGemini('สวัสดีครับ ผมมารุ เสียงนี้เป็นยังไงบ้างครับ'); }); }
 
   if(setBtn) setBtn.addEventListener('click', function(){ cfg.classList.toggle('show'); fillVoices(); });
   if(voiceSel) voiceSel.addEventListener('change', function(){
