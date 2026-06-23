@@ -186,7 +186,7 @@
       };
       // upsert sales ตามวันที่
       const existing = await sbGet('sales?select=id&sale_date=eq.' + encodeURIComponent(date) + '&limit=1');
-      if (existing.length) await sbWrite('PATCH', 'sales?sale_date=eq.' + encodeURIComponent(date), base);
+      if (existing.length) await sbWrite('PATCH', 'sales?sale_date=eq.' + encodeURIComponent(date), Object.assign({ created_at: new Date().toISOString() }, base));
       else await sbWrite('POST', 'sales', Object.assign({ created_at: new Date().toISOString() }, base));
       // แทนที่ค่าใช้จ่าย POS ของวันนั้น (ลบเก่า + ใส่ใหม่)
       await sbWrite('DELETE', 'expenses?exp_date=eq.' + encodeURIComponent(date) + '&type=eq.pos');
