@@ -143,6 +143,20 @@ async function sbFetch(path){
   if(!res.ok) throw new Error('Supabase ' + res.status + ': ' + (await res.text()).slice(0,150));
   return res.json();
 }
+// ดึงครบทุกแถว (เลี่ยง cap ดีฟอลต์ ~1000 แถวของ PostgREST) — สำคัญกับ stock_daily ที่โตเกิน 1000
+async function sbFetchAll(path){
+  let all = [], from = 0; const page = 1000;
+  for(let guard=0; guard<50; guard++){
+    const res = await fetch(SB_URL + '/rest/v1/' + path, { headers:{ apikey:SB_KEY, Authorization:'Bearer ' + SB_KEY, 'Range-Unit':'items', Range: from + '-' + (from + page - 1) } });
+    if(!res.ok) throw new Error('Supabase ' + res.status + ': ' + (await res.text()).slice(0,150));
+    const rows = await res.json();
+    if(!rows || !rows.length) break;
+    all = all.concat(rows);
+    if(rows.length < page) break;
+    from += page;
+  }
+  return all;
+}
 function sbFmtD(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
 function sbDM(s){ const p = String(s).split('-'); return p[2] + '/' + p[1] + '/' + p[0]; }
 function sbTsMs(v){ if(!v) return 0; const t = new Date(v).getTime(); return isNaN(t) ? 0 : t; }
@@ -159,9 +173,9 @@ function sbFmtTime(v){
 async function sbStockTables(){
   const [items, daily, wd, rc] = await Promise.all([
     sbFetch('stock_items?select=*'),
-    sbFetch('stock_daily?select=*'),
-    sbFetch('stock_withdraw?select=*'),
-    sbFetch('stock_receive?select=*')
+    sbFetchAll('stock_daily?select=*&order=move_date.asc,created_at.asc'),
+    sbFetchAll('stock_withdraw?select=*&order=move_date.asc'),
+    sbFetchAll('stock_receive?select=*&order=move_date.asc')
   ]);
   return { items:items, daily:daily, wd:wd, rc:rc };
 }
@@ -172,7 +186,7 @@ function sbComputeBalances(asOfDate, category, T){
   if(category && category !== 'all') itemRows = itemRows.filter(function(r){ return r.category === category; });
   const items = itemRows.map(function(r){
     return { id:r.item_id, name:r.name, category:r.category, unit:r.unit, mode:r.mode || 'withdraw',
-             minStock:Number(r.min_stock)||0, active:r.active !== false };
+             minStock:Number(r.min_stock)||0, active:r.active !== false, order:Number(r.sort_order)||0 };
   });
   const map = {};
   items.forEach(function(it){ map[it.id] = { balance:0, lastClose:null, lastCloseTs:0, todayWithdraw:0, todayReceive:0, dayWithdraw:0, dayReceive:0, prevClose:0 }; });
@@ -215,8 +229,15 @@ function sbComputeBalances(asOfDate, category, T){
       balance: Math.round(b.balance*100)/100, lastClose:b.lastClose,
       todayWithdraw: Math.round(b.todayWithdraw*100)/100, todayReceive: Math.round(b.todayReceive*100)/100,
       dayWithdraw: Math.round(b.dayWithdraw*100)/100, dayReceive: Math.round(b.dayReceive*100)/100,
-      prevClose: Math.round(b.prevClose*100)/100,
+      prevClose: Math.round(b.prevClose*100)/100, order: it.order,
       lowStock: it.minStock > 0 && b.balance <= it.minStock };
+  });
+  var CR2 = { Waffle:0, KUFF:1, Drink:2, Other:3, Others:3 };
+  list.sort(function(a,b){
+    var ra = (CR2[a.category] !== undefined ? CR2[a.category] : 9), rb = (CR2[b.category] !== undefined ? CR2[b.category] : 9);
+    if(ra !== rb) return ra - rb;
+    if((a.order||0) !== (b.order||0)) return (a.order||0) - (b.order||0);
+    return String(a.id||'').localeCompare(String(b.id||''), undefined, { numeric:true });
   });
   return { items:list,
     summary:{ total:list.length, lowStock:list.filter(function(x){return x.lowStock&&x.active;}).length, outOfStock:list.filter(function(x){return x.balance<=0&&x.active;}).length },
@@ -386,7 +407,7 @@ async function sbGetActivityFeed(p){
     sbFetch('attendance?select=att_date,att_time,type,name,in_geofence,distance'),
     sbFetch('stock_withdraw?select=move_date,move_time,item_name,qty,recorded_by'),
     sbFetch('stock_receive?select=move_date,item_name,qty,recorded_by,created_at'),
-    sbFetch('stock_daily?select=move_date,closed_by,created_at'),
+    sbFetchAll('stock_daily?select=move_date,closed_by,created_at&order=move_date.asc'),
     sbFetch('expenses?select=exp_date,item,amount,type,created_at'),
     sbFetch('stock_audit?select=audit_date,auditor,diff,created_at'),
     sbFetch('sales?select=sale_date,total,created_at')
@@ -429,7 +450,13 @@ async function sbGetStockItems(p){
   });
   const cat = p && p.category;
   const filtered = (cat && cat !== 'all') ? items.filter(function(x){ return x.category === cat; }) : items;
-  filtered.sort(function(a,b){ return a.order - b.order; });
+  var CR = { Waffle:0, KUFF:1, Drink:2, Other:3, Others:3 };
+  filtered.sort(function(a,b){
+    var ra = (CR[a.category] !== undefined ? CR[a.category] : 9), rb = (CR[b.category] !== undefined ? CR[b.category] : 9);
+    if(ra !== rb) return ra - rb;
+    if((a.order||0) !== (b.order||0)) return (a.order||0) - (b.order||0);
+    return String(a.id||'').localeCompare(String(b.id||''), undefined, { numeric:true });
+  });
   return { items:filtered };
 }
  
