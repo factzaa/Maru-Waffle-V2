@@ -697,6 +697,8 @@ async function sbCloseDailyStock(p){
   const today = sbLocalDate(), now = new Date().toISOString();
   const bal = sbComputeBalances(today, 'all', T);                 // ได้ prevClose/dayReceive/dayWithdraw ต่อรายการ
   const nm = sbNameMap(T.items);
+  const autoWdRows = [];   // เบิกอัตโนมัติจาก diff (ใช้จริง > ที่คีย์เบิก)
+  const tmNow = sbLocalTime();
   const rows = bal.items.filter(function(it){ return it.active !== false; }).map(function(it){
     const open  = Number(it.closeBalance) || 0;            // ยอดปิดล่าสุด (รวมการนับจริง)
     const recv  = Number(it.sinceReceive) || 0;            // รับเข้าหลังปิดล่าสุด
@@ -707,11 +709,21 @@ async function sbCloseDailyStock(p){
     const closeBal = hasInput ? (parseFloat(closings[it.id]) || 0) : autoClosing;
     const actUse = Math.round((open + recv - closeBal - waste) * 100) / 100;   // ใช้จริงโดยนัย
     const diff   = Math.round((actUse - used) * 100) / 100;
+    let wTotal = used, dShown = diff;
+    // ของนับชิ้น (ไม่ใช่ชั่งกรัม) ถ้าใช้จริงมากกว่าที่คีย์เบิก → สร้างรายการเบิกอัตโนมัติตามส่วนต่าง
+    if((it.mode || 'withdraw') !== 'count' && diff > 0.001){
+      autoWdRows.push({ move_date:today, move_time:tmNow, branch:SB_STOCK_BRANCH, recorded_by:staff,
+        item_id:it.id, item_name:nm[it.id]||it.name||'', qty:Math.round(diff*100)/100,
+        note:'เบิกอัตโนมัติจากการนับปิดรอบ', created_at:now });
+      wTotal = actUse; dShown = 0;   // ตอนนี้ที่คีย์เบิก = ใช้จริงแล้ว
+    }
     return { move_date:today, branch:SB_STOCK_BRANCH, closed_by:staff, item_id:it.id, item_name:nm[it.id]||it.name||'',
-      open_qty:open, receive_total:recv, withdraw_total:used, waste:waste, balance:closeBal, used:actUse, diff:diff,
+      open_qty:open, receive_total:recv, withdraw_total:wTotal, waste:waste, balance:closeBal, used:actUse, diff:dShown,
       mode:it.mode || 'withdraw', note:(data.note||'')||null, created_at:now };
   });
   if(!rows.length) return { ok:false, error:'ไม่มีรายการให้ปิดรอบ' };
+  // บันทึกรายการเบิกอัตโนมัติก่อน (timestamp เดียวกับตอนปิด → ไม่ถูกนับซ้ำหลังปิดรอบ)
+  if(autoWdRows.length){ const rw = await sbInsert('stock_withdraw', autoWdRows); if(!rw.ok) return rw; }
   const res = await sbInsert('stock_daily', rows);
   if(!res.ok) return res;
   var lineOk = false;
@@ -720,7 +732,7 @@ async function sbCloseDailyStock(p){
     var lr = await maruNotifyLine([ maruBuildStockFlex(today, SB_STOCK_BRANCH, staff, itemsArr, rows) ]);
     lineOk = !!(lr && lr.ok);
   }catch(e){}
-  return { ok:true, msg:'ปิดรอบแล้ว ' + rows.length + ' รายการ ✓' + (lineOk ? ' · ส่ง LINE แล้ว' : '') };
+  return { ok:true, msg:'ปิดรอบแล้ว ' + rows.length + ' รายการ ✓' + (autoWdRows.length ? (' · คีย์เบิกอัตโนมัติ ' + autoWdRows.length + ' รายการ') : '') + (lineOk ? ' · ส่ง LINE แล้ว' : '') };
 }
 
 // ---- ออดิทตรวจนับ + ปรับยอด ----
