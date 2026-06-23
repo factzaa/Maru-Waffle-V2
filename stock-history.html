@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>ประวัติเคลื่อนไหวสต๊อก · Maru Waffle</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#FFC629">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+.filterbar{background:#fff;border-radius:14px;padding:12px 14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(120,86,0,.06);}
+.filterbar .rowd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:9px;}
+.filterbar label{font-family:'Kanit';font-weight:600;font-size:12.5px;color:var(--ink-2);}
+.filterbar input[type=date]{flex:1;min-width:120px;border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;font-family:'Sarabun';font-size:14px;background:#FFFDF6;color:var(--ink);}
+.presets{display:flex;gap:6px;flex-wrap:wrap;}
+.presets .pg{border:1.5px solid var(--line);background:#fff;border-radius:9px;padding:7px 12px;font-size:12.5px;font-weight:600;font-family:'Sarabun';cursor:pointer;color:var(--ink);}
+.presets .pg.on{background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#2E2400;border-color:#F2B100;}
+.catchips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;}
+.catchips .cc{border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:7px 13px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);white-space:nowrap;}
+.catchips .cc.on{background:#1A1A1A;color:#FFC629;border-color:#1A1A1A;}
+.daycard{background:#fff;border-radius:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(120,86,0,.07);overflow:hidden;}
+.daycard .dh{display:flex;align-items:center;gap:8px;padding:11px 14px;background:linear-gradient(180deg,#FFF7E0,#FFF1CC);border-bottom:1px solid var(--line);}
+.daycard .dh .dd{font-family:'Kanit';font-weight:800;font-size:15px;color:#1A1A1A;}
+.daycard .dh .dw{font-size:12px;color:#8A6A00;}
+.daycard .dh .ds{margin-left:auto;font-size:11.5px;color:var(--ink-2);text-align:right;line-height:1.4;}
+.daycard .dh .ds .r{color:#15803D;font-weight:700;} .daycard .dh .ds .o{color:#B91C1C;font-weight:700;}
+.irow{padding:9px 14px;border-bottom:1px dashed #F0E4C4;}
+.irow:last-child{border-bottom:0;}
+.irow .nm{font-family:'Kanit';font-weight:600;font-size:13.5px;color:var(--ink);display:flex;align-items:center;gap:7px;}
+.irow .nm .ct{font-size:10px;color:#9A8C6E;font-weight:600;background:#F2EEDD;padding:1px 7px;border-radius:7px;}
+.irow .mv{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;font-size:12.5px;font-family:'Kanit';}
+.irow .mv .seg{background:#FFFCEF;border:1px solid var(--line);border-radius:8px;padding:2px 9px;color:var(--ink-2);}
+.irow .mv .seg b{color:var(--ink);font-weight:700;}
+.irow .mv .seg.recv b{color:#15803D;} .irow .mv .seg.out b{color:#B91C1C;} .irow .mv .seg.waste b{color:#D97706;}
+.irow .mv .seg.bal{background:#ECFDF5;border-color:#A7F3D0;} .irow .mv .seg.bal b{color:#059669;}
+.empty{text-align:center;color:var(--ink-2);padding:30px 12px;font-size:14px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="head">
+    <h1>ประวัติเคลื่อนไหวสต๊อก</h1>
+    <div class="sub">Maru Waffle · เริ่มต้น · รับเข้า · เบิก · คงเหลือ รายวัน</div>
+  </div>
+  <div class="sheet">
+    <div class="filterbar">
+      <div class="rowd"><label>จาก</label><input type="date" id="fStart"><label>ถึง</label><input type="date" id="fEnd"></div>
+      <div class="presets" id="presets">
+        <button class="pg" data-r="7">7 วัน</button>
+        <button class="pg" data-r="30">30 วัน</button>
+        <button class="pg on" data-r="month">เดือนนี้</button>
+      </div>
+    </div>
+    <div class="catchips" id="catChips">
+      <button class="cc on" data-cat="all">ทั้งหมด</button>
+      <button class="cc" data-cat="Waffle">🧁 Waffle</button>
+      <button class="cc" data-cat="KUFF">🥐 KUFF</button>
+      <button class="cc" data-cat="Drink">🥤 Drink</button>
+      <button class="cc" data-cat="Other">📦 อื่นๆ</button>
+    </div>
+    <div id="histBody"><div class="empty">กำลังโหลด...</div></div>
+    <div class="foot">🐤 แสดงเฉพาะวัน/รายการที่มีความเคลื่อนไหว (รับเข้า/เบิก/ของเสีย)</div>
+  </div>
+</div>
+
+<script src="shared.js"></script>
+<script>
+injectShell('stockHistory');
+registerSW();
+var $ = function(id){ return document.getElementById(id); };
+var st = { start:'', end:'', cat:'all' };
+
+function fmtD(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function setRange(r){
+  var end = new Date(), start = new Date();
+  if(r === 'month'){ start = new Date(end.getFullYear(), end.getMonth(), 1); }
+  else { start.setDate(end.getDate() - (parseInt(r)-1)); }
+  $('fStart').value = fmtD(start); $('fEnd').value = fmtD(end);
+  st.start = $('fStart').value; st.end = $('fEnd').value;
+}
+function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function n(x){ var v=Math.round((Number(x)||0)*100)/100; return (v%1===0)? String(v) : v.toFixed(2); }
+
+function load(){
+  $('histBody').innerHTML = '<div class="empty">กำลังโหลด...</div>';
+  api('getStockMoveHistory', { start:st.start, end:st.end, category:st.cat })
+    .then(render)
+    .catch(function(e){ $('histBody').innerHTML = '<div class="empty">โหลดไม่ได้: '+esc(e.message)+'</div>'; });
+}
+function render(res){
+  var days = (res && res.days) || [];
+  if(!days.length){ $('histBody').innerHTML = '<div class="empty">ไม่มีความเคลื่อนไหวในช่วงนี้</div>'; return; }
+  $('histBody').innerHTML = days.map(function(d){
+    var rows = d.items.map(function(it){
+      var segs = '<span class="seg">เริ่ม <b>'+n(it.open)+'</b></span>';
+      if(it.receive>0) segs += '<span class="seg recv">รับ <b>+'+n(it.receive)+'</b></span>';
+      if(it.used>0)    segs += '<span class="seg out">เบิก/ใช้ <b>-'+n(it.used)+'</b></span>';
+      if(it.waste>0)   segs += '<span class="seg waste">เสีย <b>-'+n(it.waste)+'</b></span>';
+      segs += '<span class="seg bal">เหลือ <b>'+n(it.balance)+'</b> '+esc(it.unit||'')+'</span>';
+      return '<div class="irow"><div class="nm">'+esc(it.name)+' <span class="ct">'+esc(it.category)+'</span></div><div class="mv">'+segs+'</div></div>';
+    }).join('');
+    return '<div class="daycard"><div class="dh"><div><div class="dd">'+esc(d.dateDM)+'</div><div class="dw">วัน'+esc(d.dow)+'</div></div>'
+      +'<div class="ds">'+d.count+' รายการ<br><span class="r">รับ +'+n(d.totalReceive)+'</span> · <span class="o">ออก -'+n(d.totalUsed)+'</span></div></div>'
+      + rows + '</div>';
+  }).join('');
+}
+
+setRange('month'); load();
+$('presets').addEventListener('click', function(e){
+  var b = e.target.closest('.pg'); if(!b) return;
+  $('#presets .pg.on') && document.querySelectorAll('#presets .pg').forEach(function(x){x.classList.remove('on');});
+  b.classList.add('on'); setRange(b.dataset.r); load();
+});
+$('fStart').addEventListener('change', function(){ st.start=this.value; document.querySelectorAll('#presets .pg').forEach(function(x){x.classList.remove('on');}); load(); });
+$('fEnd').addEventListener('change', function(){ st.end=this.value; document.querySelectorAll('#presets .pg').forEach(function(x){x.classList.remove('on');}); load(); });
+$('catChips').addEventListener('click', function(e){
+  var b = e.target.closest('.cc'); if(!b) return;
+  document.querySelectorAll('#catChips .cc').forEach(function(x){x.classList.remove('on');});
+  b.classList.add('on'); st.cat = b.dataset.cat; load();
+});
+</script>
+</body>
+</html>

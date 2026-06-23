@@ -969,6 +969,45 @@ async function sbGetRemitHistory(){
 }
 
 // action ที่ย้ายมา Supabase แล้ว (เพิ่มทีละตัวได้)
+async function sbGetStockMoveHistory(p){
+  p = p || {};
+  const start = p.start || '';
+  const end = p.end || sbFmtD(new Date());
+  const cat = p.category || 'all';
+  const T = await sbStockTables();
+  const meta = {};
+  T.items.forEach(function(r){ meta[r.item_id] = { name:r.name, category:r.category, order:Number(r.sort_order)||0, unit:r.unit, mode:r.mode || 'withdraw' }; });
+  const CR = { Waffle:0, KUFF:1, Drink:2, Other:3, Others:3 };
+  const byDate = {};
+  (T.daily || []).forEach(function(r){
+    const id = r.item_id, m = meta[id]; if(!m) return;
+    const dt = r.move_date; if(!dt) return;
+    if(start && dt < start) return;
+    if(end && dt > end) return;
+    if(cat !== 'all' && m.category !== cat) return;
+    const recv = Number(r.receive_total)||0, used = Number(r.used)||0, waste = Number(r.waste)||0, wdt = Number(r.withdraw_total)||0;
+    if(!(recv>0 || used>0 || waste>0 || wdt>0)) return;   // เฉพาะที่มีความเคลื่อนไหว
+    if(!byDate[dt]) byDate[dt] = [];
+    byDate[dt].push({ id:id, name:m.name, category:m.category, unit:m.unit, order:m.order, mode:m.mode,
+      open:Number(r.open_qty)||0, receive:recv, used:used, withdrawTotal:wdt, waste:waste, balance:Number(r.balance)||0 });
+  });
+  const dates = Object.keys(byDate).sort(function(a,b){ return String(b).localeCompare(String(a)); });
+  const days = dates.map(function(dt){
+    const items = byDate[dt].sort(function(a,b){
+      const ra = (CR[a.category] !== undefined ? CR[a.category] : 9), rb = (CR[b.category] !== undefined ? CR[b.category] : 9);
+      if(ra !== rb) return ra - rb;
+      if((a.order||0) !== (b.order||0)) return (a.order||0) - (b.order||0);
+      return String(a.id||'').localeCompare(String(b.id||''), undefined, { numeric:true });
+    });
+    let tRecv = 0, tUsed = 0, tWaste = 0;
+    items.forEach(function(x){ tRecv += x.receive; tUsed += x.used; tWaste += x.waste; });
+    const d = new Date(dt + 'T00:00:00');
+    return { date:dt, dateDM:sbDM(dt), dow:SB_DOW[d.getDay()], count:items.length,
+      totalReceive:Math.round(tRecv*100)/100, totalUsed:Math.round(tUsed*100)/100, totalWaste:Math.round(tWaste*100)/100, items:items };
+  });
+  return { ok:true, days:days, range:{ start:start, end:end } };
+}
+
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
   getDashboardData: sbGetDashboardData,
@@ -977,6 +1016,7 @@ const SB_ACTIONS = {
   getActivityFeed: sbGetActivityFeed,
   getStockItems: sbGetStockItems,
   getStockDashboard: sbGetStockDashboard,
+  getStockMoveHistory: sbGetStockMoveHistory,
   getAttendStaff: sbGetAttendStaff,
   getAttendReport: sbGetAttendReport,
   getConfig: sbGetConfig,
@@ -1083,6 +1123,7 @@ function buildSidebar(currentPage){
     { page:'dash',           href:'records.html#dash',    icon:'trend',        label:'แดชบอร์ดยอดขาย' },
     { page:'expreport',      href:'expenses-report.html', icon:'trend',      label:'รายงานสรุปค่าใช้จ่าย' },
     { page:'stockDashboard', href:'stock-dashboard.html', icon:'dash',     label:'แดชบอร์ดสต๊อก' },
+    { page:'stockHistory',   href:'stock-history.html',   icon:'trend',        label:'ประวัติเคลื่อนไหวสต๊อก' },
     { page:'stockView',      href:'stock-view.html',      icon:'store',        label:'ตรวจสต๊อก' },
     { page:'attendReport',   href:'attend-report.html',   icon:'trend', label:'รายงานเข้า-ออกงาน' },
     { page:'stockAuditReport', href:'stock-audit-report.html', icon:'check',   label:'ประวัติออดิท' },
