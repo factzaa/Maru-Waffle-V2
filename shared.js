@@ -1798,9 +1798,9 @@ function bindMaruAssistant(currentPage){
   if(attB && imgInput){
     attB.addEventListener('click', function(){ imgInput.click(); });
     imgInput.addEventListener('change', function(){
-      var files = this.files; this.value = '';
-      if(!files || !files.length) return;
-      Array.prototype.slice.call(files).forEach(function(f){
+      var files = Array.prototype.slice.call(this.files||[]); this.value = '';
+      if(!files.length) return;
+      files.forEach(function(f){
         if(maruPromoImgs.length >= MARU_MAX_IMGS) return;
         var rd = new FileReader();
         rd.onload = function(){
