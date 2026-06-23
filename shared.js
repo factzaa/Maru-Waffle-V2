@@ -189,7 +189,7 @@ function sbComputeBalances(asOfDate, category, T){
              minStock:Number(r.min_stock)||0, active:r.active !== false, order:Number(r.sort_order)||0 };
   });
   const map = {};
-  items.forEach(function(it){ map[it.id] = { balance:0, lastClose:null, lastCloseTs:0, todayWithdraw:0, todayReceive:0, dayWithdraw:0, dayReceive:0, prevClose:0 }; });
+  items.forEach(function(it){ map[it.id] = { balance:0, lastClose:null, lastCloseTs:0, todayWithdraw:0, todayReceive:0, dayWithdraw:0, dayReceive:0, prevClose:0, closeBalance:0, sinceWithdraw:0, sinceReceive:0 }; });
  
   const d = T.daily.slice().sort(function(a,b){ return String(b.move_date).localeCompare(String(a.move_date)); });
   const seen = {}, seenPrev = {};
@@ -199,6 +199,7 @@ function sbComputeBalances(asOfDate, category, T){
     if(!seen[id]){ seen[id] = true; map[id].balance = Number(r.balance)||0; map[id].lastClose = dt; map[id].lastCloseTs = sbTsMs(r.created_at); }
     if(dt < asOfDate && !seenPrev[id]){ seenPrev[id] = true; map[id].prevClose = Number(r.balance)||0; }
   });
+  items.forEach(function(it){ map[it.id].closeBalance = map[it.id].balance; });
  
   T.wd.forEach(function(r){
     const id = r.item_id; if(!map[id]) return;
@@ -209,6 +210,7 @@ function sbComputeBalances(asOfDate, category, T){
       if(dt === map[id].lastClose){ if(!map[id].lastCloseTs) return; const ts = sbTsMs(r.created_at); if(!ts || ts <= map[id].lastCloseTs) return; }
     }
     map[id].balance -= Number(r.qty)||0;
+    map[id].sinceWithdraw += Number(r.qty)||0;
     if(dt === asOfDate) map[id].todayWithdraw += Number(r.qty)||0;
   });
   T.rc.forEach(function(r){
@@ -220,6 +222,7 @@ function sbComputeBalances(asOfDate, category, T){
       if(dt === map[id].lastClose){ if(!map[id].lastCloseTs) return; const ts = sbTsMs(r.created_at); if(!ts || ts <= map[id].lastCloseTs) return; }
     }
     map[id].balance += Number(r.qty)||0;
+    map[id].sinceReceive += Number(r.qty)||0;
     if(dt === asOfDate) map[id].todayReceive += Number(r.qty)||0;
   });
  
@@ -230,6 +233,7 @@ function sbComputeBalances(asOfDate, category, T){
       todayWithdraw: Math.round(b.todayWithdraw*100)/100, todayReceive: Math.round(b.todayReceive*100)/100,
       dayWithdraw: Math.round(b.dayWithdraw*100)/100, dayReceive: Math.round(b.dayReceive*100)/100,
       prevClose: Math.round(b.prevClose*100)/100, order: it.order,
+      closeBalance: Math.round(b.closeBalance*100)/100, sinceWithdraw: Math.round(b.sinceWithdraw*100)/100, sinceReceive: Math.round(b.sinceReceive*100)/100,
       lowStock: it.minStock > 0 && b.balance <= it.minStock };
   });
   var CR2 = { Waffle:0, KUFF:1, Drink:2, Other:3, Others:3 };
@@ -694,9 +698,9 @@ async function sbCloseDailyStock(p){
   const bal = sbComputeBalances(today, 'all', T);                 // ได้ prevClose/dayReceive/dayWithdraw ต่อรายการ
   const nm = sbNameMap(T.items);
   const rows = bal.items.filter(function(it){ return it.active !== false; }).map(function(it){
-    const open  = Number(it.prevClose) || 0;
-    const recv  = Number(it.dayReceive) || 0;
-    const used  = Number(it.dayWithdraw) || 0;                    // = withdraw_total
+    const open  = Number(it.closeBalance) || 0;            // ยอดปิดล่าสุด (รวมการนับจริง)
+    const recv  = Number(it.sinceReceive) || 0;            // รับเข้าหลังปิดล่าสุด
+    const used  = Number(it.sinceWithdraw) || 0;           // เบิกหลังปิดล่าสุด
     const waste = parseFloat(wastes[it.id]) || 0;
     const autoClosing = Math.round((open + recv - used - waste) * 100) / 100;
     const hasInput = (closings[it.id] !== undefined && closings[it.id] !== '');
