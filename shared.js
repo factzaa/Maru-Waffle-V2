@@ -1425,16 +1425,16 @@ async function maruTtsGemini(text){
     if(maruTtsAudio){ try{ maruTtsAudio.pause(); }catch(e){} maruTtsAudio=null; }
     var voice = localStorage.getItem('maruGemVoice') || 'Aoede';
     var res = await fetch(EDGE_URL, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY }, body: JSON.stringify({ action:'ttsSpeak', text:text, voice:voice }) });
-    if(!res.ok) return;
+    if(!res.ok){ maruDeviceSpeak(text); return; }
     var d = await res.json();
-    if(!(d && d.ok && d.audio)) return;
+    if(!(d && d.ok && d.audio)){ maruDeviceSpeak(text); return; }
     var rate = 24000; var m = String(d.mime||'').match(/rate=(\d+)/); if(m) rate = parseInt(m[1],10);
     var blob = maruPcmToWav(d.audio, rate);
     var url = URL.createObjectURL(blob);
     maruTtsAudio = new Audio(url);
     maruTtsAudio.play().catch(function(){});
     maruTtsAudio.onended = function(){ try{ URL.revokeObjectURL(url); }catch(e){} };
-  }catch(e){}
+  }catch(e){ maruDeviceSpeak(text); }
 }
 function maruPcmToWav(b64, rate){
   var bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
@@ -1449,12 +1449,8 @@ function maruPcmToWav(b64, rate){
   new Uint8Array(buf,44).set(bytes);
   return new Blob([buf], { type:'audio/wav' });
 }
-function maruPlay(text){
+function maruDeviceSpeak(clean){
   try{
-    if(localStorage.getItem('maruMute') === '1') return;   // ปิดเสียงไว้
-    var clean = maruCleanForSpeech(text);
-    if(!clean) return;
-    if(localStorage.getItem('maruGeminiVoice') === '1'){ maruTtsGemini(clean); return; }
     if(!window.speechSynthesis) return;
     speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(clean);
@@ -1465,6 +1461,15 @@ function maruPlay(text){
     var pick = want ? list.filter(function(v){ return v.name === want; })[0] : list[0];
     if(pick) u.voice = pick;
     speechSynthesis.speak(u);
+  }catch(e){}
+}
+function maruPlay(text){
+  try{
+    if(localStorage.getItem('maruMute') === '1') return;   // ปิดเสียงไว้
+    var clean = maruCleanForSpeech(text);
+    if(!clean) return;
+    if(localStorage.getItem('maruGeminiVoice') === '1'){ maruTtsGemini(clean); return; }
+    maruDeviceSpeak(clean);
   }catch(e){}
 }
 
