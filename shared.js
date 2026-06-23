@@ -1420,21 +1420,24 @@ function maruRich(text){
 }
 
 var maruTtsAudio = null;
-async function maruTtsGemini(text){
+async function maruTtsGemini(text, onReady){
+  var revealed=false; var reveal=function(){ if(!revealed){ revealed=true; if(onReady) onReady(); } };
+  var safety=setTimeout(reveal, 6000);   // กันค้าง: ถ้าเสียงช้ามาก ก็โชว์ข้อความก่อนได้
   try{
     if(maruTtsAudio){ try{ maruTtsAudio.pause(); }catch(e){} maruTtsAudio=null; }
     var voice = localStorage.getItem('maruGemVoice') || 'Aoede';
     var res = await fetch(EDGE_URL, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY }, body: JSON.stringify({ action:'ttsSpeak', text:text, voice:voice }) });
-    if(!res.ok){ maruDeviceSpeak(text); return; }
+    if(!res.ok){ clearTimeout(safety); reveal(); maruDeviceSpeak(text); return; }
     var d = await res.json();
-    if(!(d && d.ok && d.audio)){ maruDeviceSpeak(text); return; }
+    if(!(d && d.ok && d.audio)){ clearTimeout(safety); reveal(); maruDeviceSpeak(text); return; }
     var rate = 24000; var m = String(d.mime||'').match(/rate=(\d+)/); if(m) rate = parseInt(m[1],10);
     var blob = maruPcmToWav(d.audio, rate);
     var url = URL.createObjectURL(blob);
     maruTtsAudio = new Audio(url);
+    clearTimeout(safety); reveal();   // โชว์ข้อความตอนเสียงพร้อมเล่น → มาพร้อมกัน
     maruTtsAudio.play().catch(function(){});
     maruTtsAudio.onended = function(){ try{ URL.revokeObjectURL(url); }catch(e){} };
-  }catch(e){ maruDeviceSpeak(text); }
+  }catch(e){ clearTimeout(safety); reveal(); maruDeviceSpeak(text); }
 }
 function maruPcmToWav(b64, rate){
   var bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
@@ -2011,11 +2014,13 @@ function bindMaruAssistant(currentPage){
           return window.maruSend(text);   // ถามซ้ำพร้อมรหัส
         }
       } else if(r.ok){
-        maruAdd(r.reply,'ai');
         maruHistory.push({role:'user',text:text});
         maruHistory.push({role:'model',text:r.reply});
         if(maruHistory.length>24) maruHistory = maruHistory.slice(-24);
-        maruPlay(r.reply);
+        var __show = function(){ maruAdd(r.reply,'ai'); };
+        if(localStorage.getItem('maruMute') === '1'){ __show(); }
+        else if(localStorage.getItem('maruGeminiVoice') === '1'){ maruDots(); maruTtsGemini(r.reply, function(){ maruNoDots(); __show(); }); }   // รอเสียงพร้อม แล้วโชว์ข้อความ+เล่นพร้อมกัน
+        else { __show(); maruDeviceSpeak(maruCleanForSpeech(r.reply)); }
       } else {
         maruAdd(r.error || 'ขอโทษครับ ตอบไม่ได้ตอนนี้','er');
       }
