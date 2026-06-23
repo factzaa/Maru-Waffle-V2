@@ -115,6 +115,19 @@
   </div>
 </div>
 
+<div class="wdmodal" id="wdModal">
+  <div class="box">
+    <div class="wh"><span>📋</span><span>ตรวจพบการใช้สต๊อกที่ยังไม่ได้คีย์เบิก</span></div>
+    <div class="intro">ระบบพบ <b id="wdCount">0</b> รายการที่ยอดคงเหลือลดลงจากการใช้งานระหว่างวัน แต่ยังไม่มีการบันทึกเบิกในระบบ</div>
+    <ul id="wdList"></ul>
+    <div class="auto">ℹ️ ครั้งนี้ระบบจะบันทึกรายการเบิกให้อัตโนมัติ เพื่อให้ข้อมูลสต๊อกครบถ้วนและตรวจสอบย้อนหลังได้</div>
+    <div class="ask">🙏 ขอความร่วมมือ: ครั้งต่อไปกรุณาคีย์เบิกทุกครั้งที่หยิบของไปใช้ระหว่างวัน จะช่วยให้ทราบความเคลื่อนไหวสต๊อกแบบเรียลไทม์ และตรวจสอบได้แม่นยำยิ่งขึ้น</div>
+    <div class="wbtns">
+      <button class="wm-ok" id="wdOk">✓ ยืนยันปิดรอบ (บันทึกเบิกให้)</button>
+      <button class="wm-cancel" id="wdCancel">ยกเลิก · กลับไปคีย์เบิกเอง</button>
+    </div>
+  </div>
+</div>
 <script src="shared.js"></script>
 <script>
 injectShell('stockClose');
@@ -301,18 +314,5 @@ document.getElementById('wdModal').addEventListener('click', function(e){ if(e.t
 renderIcons();
 load();
 </script>
-<div class="wdmodal" id="wdModal">
-  <div class="box">
-    <div class="wh"><span>📋</span><span>ตรวจพบการใช้สต๊อกที่ยังไม่ได้คีย์เบิก</span></div>
-    <div class="intro">ระบบพบ <b id="wdCount">0</b> รายการที่ยอดคงเหลือลดลงจากการใช้งานระหว่างวัน แต่ยังไม่มีการบันทึกเบิกในระบบ</div>
-    <ul id="wdList"></ul>
-    <div class="auto">ℹ️ ครั้งนี้ระบบจะบันทึกรายการเบิกให้อัตโนมัติ เพื่อให้ข้อมูลสต๊อกครบถ้วนและตรวจสอบย้อนหลังได้</div>
-    <div class="ask">🙏 ขอความร่วมมือ: ครั้งต่อไปกรุณาคีย์เบิกทุกครั้งที่หยิบของไปใช้ระหว่างวัน จะช่วยให้ทราบความเคลื่อนไหวสต๊อกแบบเรียลไทม์ และตรวจสอบได้แม่นยำยิ่งขึ้น</div>
-    <div class="wbtns">
-      <button class="wm-ok" id="wdOk">✓ ยืนยันปิดรอบ (บันทึกเบิกให้)</button>
-      <button class="wm-cancel" id="wdCancel">ยกเลิก · กลับไปคีย์เบิกเอง</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>
