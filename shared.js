@@ -126,7 +126,7 @@ function apiSWR(action, params, onData){
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
 const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
-const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1, notifyLine:1 };
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1, notifyLine:1, ttsSpeak:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -1236,6 +1236,10 @@ function maruAssistantMarkup(currentPage){
    + '.maru-in textarea{flex:1;resize:none;border:1.5px solid #ECE6D6;border-radius:13px;padding:10px 13px;font-family:"Sarabun";font-size:14px;max-height:110px;line-height:1.4;background:#fff;color:#1A1A1A;}'
    + '.maru-in textarea:focus{outline:none;border-color:#FFC629;}'
    + '.maru-att{width:42px;height:42px;border-radius:50%;border:1.5px solid #ECE6D6;background:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;}'
+   + '.maru-attthumbs{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0;}'
+   + '.maru-attthumbs .athumb{position:relative;width:42px;height:42px;flex:none;}'
+   + '.maru-attthumbs .athumb img{width:100%;height:100%;border-radius:8px;object-fit:cover;}'
+   + '.maru-attthumbs .athumb button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#1A1A1A;color:#fff;border:0;font-size:10px;line-height:1;cursor:pointer;padding:0;}'
    + '.maru-mic{width:42px;height:42px;border-radius:50%;border:1.5px solid #ECE6D6;background:#fff;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;}'
    + '.maru-wave{display:inline-flex;align-items:center;gap:2.5px;height:18px;}'
    + '.maru-wave i{width:3px;height:7px;background:#1A1A1A;border-radius:2px;animation:maruwv 1.1s infinite ease-in-out;}'
@@ -1255,6 +1259,7 @@ function maruAssistantMarkup(currentPage){
    +     '<div class="cfg-row"><span>เสียง</span><select id="maruVoiceSel"></select></div>'
    +     '<div class="cfg-row"><span>ความเร็ว</span><input type="range" id="maruRateSel" min="0.7" max="1.4" step="0.1"></div>'
    +     '<label class="cfg-mute"><input type="checkbox" id="maruMuteChk"> ปิดเสียงพูด</label>'
+   +     '<label class="cfg-mute"><input type="checkbox" id="maruGemVoiceChk"> เสียง Gemini (เพราะกว่า · ช้านิด)</label>'
    +   '</div>'
    +   '<div class="maru-msgs" id="maruMsgs"><div class="maru-hi" id="maruHi">'
    +     '<img class="mh-av" src="Logo.png" alt="มารุ">'
@@ -1283,10 +1288,10 @@ function maruAssistantMarkup(currentPage){
    +       '</div>'
    +     '</div>'
    +   '</div></div>'
-   +   '<div class="maru-attchip" id="maruAttChip"><img id="maruAttThumb" alt=""><span class="nm" id="maruAttName">รูปแนบ</span><button class="rm" id="maruAttRm">ลบ</button></div>'
+   +   '<div class="maru-attchip" id="maruAttChip"><div class="maru-attthumbs" id="maruAttThumbs"></div><button class="rm" id="maruAttRm">ลบ</button></div>'
    +   '<div class="maru-in">'
    +     '<button class="maru-att" id="maruAtt" title="แนบรูปทำโพสต์">📎</button>'
-   +     '<input type="file" accept="image/*" id="maruImgInput" style="display:none">'
+   +     '<input type="file" accept="image/*" id="maruImgInput" multiple style="display:none">'
    +     '<textarea id="maruInp" rows="1" placeholder="พิมพ์ข้อความ..."></textarea>'
    +     '<button class="maru-send" id="maruSend">➤</button>'
    +   '</div>'
@@ -1414,12 +1419,43 @@ function maruRich(text){
   return esc.replace(/\n/g, '<br>');
 }
 
+var maruTtsAudio = null;
+async function maruTtsGemini(text){
+  try{
+    if(maruTtsAudio){ try{ maruTtsAudio.pause(); }catch(e){} maruTtsAudio=null; }
+    var voice = localStorage.getItem('maruGemVoice') || 'Aoede';
+    var res = await fetch(EDGE_URL, { method:'POST', headers:{ 'Content-Type':'application/json', apikey:SB_KEY }, body: JSON.stringify({ action:'ttsSpeak', text:text, voice:voice }) });
+    if(!res.ok) return;
+    var d = await res.json();
+    if(!(d && d.ok && d.audio)) return;
+    var rate = 24000; var m = String(d.mime||'').match(/rate=(\d+)/); if(m) rate = parseInt(m[1],10);
+    var blob = maruPcmToWav(d.audio, rate);
+    var url = URL.createObjectURL(blob);
+    maruTtsAudio = new Audio(url);
+    maruTtsAudio.play().catch(function(){});
+    maruTtsAudio.onended = function(){ try{ URL.revokeObjectURL(url); }catch(e){} };
+  }catch(e){}
+}
+function maruPcmToWav(b64, rate){
+  var bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
+  for(var i=0;i<len;i++) bytes[i] = bin.charCodeAt(i);
+  var numCh=1, bps=16, blockAlign=numCh*bps/8, byteRate=rate*blockAlign;
+  var buf = new ArrayBuffer(44+len), dv = new DataView(buf);
+  function ws(o,str){ for(var i=0;i<str.length;i++) dv.setUint8(o+i, str.charCodeAt(i)); }
+  ws(0,'RIFF'); dv.setUint32(4,36+len,true); ws(8,'WAVE'); ws(12,'fmt ');
+  dv.setUint32(16,16,true); dv.setUint16(20,1,true); dv.setUint16(22,numCh,true);
+  dv.setUint32(24,rate,true); dv.setUint32(28,byteRate,true); dv.setUint16(32,blockAlign,true);
+  dv.setUint16(34,bps,true); ws(36,'data'); dv.setUint32(40,len,true);
+  new Uint8Array(buf,44).set(bytes);
+  return new Blob([buf], { type:'audio/wav' });
+}
 function maruPlay(text){
   try{
-    if(!window.speechSynthesis) return;
     if(localStorage.getItem('maruMute') === '1') return;   // ปิดเสียงไว้
     var clean = maruCleanForSpeech(text);
     if(!clean) return;
+    if(localStorage.getItem('maruGeminiVoice') === '1'){ maruTtsGemini(clean); return; }
+    if(!window.speechSynthesis) return;
     speechSynthesis.cancel();
     var u = new SpeechSynthesisUtterance(clean);
     u.lang = 'th-TH';
@@ -1697,7 +1733,7 @@ function bindMaruAssistant(currentPage){
   var voiceSel = document.getElementById('maruVoiceSel');
   var rateSel = document.getElementById('maruRateSel');
   var muteChk = document.getElementById('maruMuteChk');
-  if(!window.speechSynthesis){ if(setBtn) setBtn.style.display='none'; }
+  // ตั้งค่าใช้ได้เสมอ (มีตัวเลือกเสียง Gemini แม้ไม่มีเสียงในเครื่อง)
   function fillVoices(){
     if(!voiceSel) return;
     var list = maruThaiVoices();
@@ -1712,6 +1748,8 @@ function bindMaruAssistant(currentPage){
   if(window.speechSynthesis) speechSynthesis.addEventListener('voiceschanged', fillVoices);
   if(rateSel) rateSel.value = localStorage.getItem('maruRate') || '1';
   if(muteChk) muteChk.checked = localStorage.getItem('maruMute') === '1';
+  var gemChk = document.getElementById('maruGemVoiceChk');
+  if(gemChk){ gemChk.checked = localStorage.getItem('maruGeminiVoice') === '1'; gemChk.addEventListener('change', function(){ localStorage.setItem('maruGeminiVoice', gemChk.checked ? '1' : '0'); }); }
 
   if(setBtn) setBtn.addEventListener('click', function(){ cfg.classList.toggle('show'); fillVoices(); });
   if(voiceSel) voiceSel.addEventListener('change', function(){
@@ -1735,25 +1773,39 @@ function bindMaruAssistant(currentPage){
   var attThumb = document.getElementById('maruAttThumb');
   var attName = document.getElementById('maruAttName');
   var attRm = document.getElementById('maruAttRm');
-  var maruPromoImg = null;   // { imgEl, dataURL, name }
-  function clearAtt(){ maruPromoImg = null; if(attChip) attChip.classList.remove('show'); }
+  var maruPromoImgs = [];   // [{ imgEl, dataURL, name }]
+  var MARU_MAX_IMGS = 3;
+  var attThumbs = document.getElementById('maruAttThumbs');
+  function maruRenderThumbs(){
+    if(!attThumbs) return; attThumbs.innerHTML = '';
+    maruPromoImgs.forEach(function(p, idx){
+      var w = document.createElement('div'); w.className = 'athumb';
+      var im = document.createElement('img'); im.src = p.dataURL; w.appendChild(im);
+      var b = document.createElement('button'); b.type='button'; b.textContent='✕';
+      b.addEventListener('click', function(){ maruPromoImgs.splice(idx,1); maruRenderThumbs(); if(!maruPromoImgs.length && attChip) attChip.classList.remove('show'); });
+      w.appendChild(b); attThumbs.appendChild(w);
+    });
+  }
+  function clearAtt(){ maruPromoImgs = []; if(attChip) attChip.classList.remove('show'); if(attThumbs) attThumbs.innerHTML=''; }
   if(attB && imgInput){
     attB.addEventListener('click', function(){ imgInput.click(); });
     imgInput.addEventListener('change', function(){
-      var f = this.files && this.files[0]; this.value = '';
-      if(!f) return;
-      var rd = new FileReader();
-      rd.onload = function(){
-        var im = new Image();
-        im.onload = function(){
-          maruPromoImg = { imgEl: im, dataURL: rd.result, name: f.name || 'รูปแนบ' };
-          if(attThumb) attThumb.src = rd.result;
-          if(attName) attName.textContent = f.name || 'รูปแนบ';
-          if(attChip) attChip.classList.add('show');
+      var files = this.files; this.value = '';
+      if(!files || !files.length) return;
+      Array.prototype.slice.call(files).forEach(function(f){
+        if(maruPromoImgs.length >= MARU_MAX_IMGS) return;
+        var rd = new FileReader();
+        rd.onload = function(){
+          var im = new Image();
+          im.onload = function(){
+            if(maruPromoImgs.length >= MARU_MAX_IMGS) return;
+            maruPromoImgs.push({ imgEl: im, dataURL: rd.result, name: f.name || 'รูปแนบ' });
+            if(attChip) attChip.classList.add('show'); maruRenderThumbs();
+          };
+          im.src = rd.result;
         };
-        im.src = rd.result;
-      };
-      rd.readAsDataURL(f);
+        rd.readAsDataURL(f);
+      });
     });
   }
   if(attRm) attRm.addEventListener('click', clearAtt);
@@ -1789,7 +1841,7 @@ function bindMaruAssistant(currentPage){
 
   // ===== เฟส 1: สร้างแคปชั่นโพสต์การตลาด (แยกอิสระจาก askAI) =====
   function maruIsPromo(text){
-    return /ทำโพสต์|สร้างโพสต์|ขอโพสต์|แคปชั่น|caption|โพสต์ขาย|โพสต์โปร|ทำโฆษณา|เขียนโฆษณา|โปรโมชั่น/i.test(text);
+    return /ทำโพสต์|สร้างโพสต์|ขอโพสต์|เขียนโพสต์|โพสต์ขาย|โพสต์โปร|โพสต์ลง|ลงโพสต์|แคปชั่น|caption|ทำโฆษณา|เขียนโฆษณา|ทำโปสเตอร์|ทำป้ายโปร|ลงเฟส|ลงเพจ|ลงไอจี|ลงไลน์|ลง ?ig|ลง ?fb/i.test(text);
   }
   function maruChannelsFrom(text){
     var c = [];
@@ -1867,10 +1919,10 @@ function bindMaruAssistant(currentPage){
   }
   async function maruPromo(text){
     var chans = maruChannelsFrom(text);
-    var img = maruPromoImg;            // รูปที่แนบ (ถ้ามี)
+    var imgs = maruPromoImgs;            // รูปที่แนบ (อาจหลายรูป)
     var wantAi = maruWantsAiImage(text);
     // แต่งรูปด้วย AI ได้เฉพาะ "จากรูปที่แนบ" เท่านั้น — ถ้าสั่งแต่งแต่ไม่มีรูป ให้เตือน (ไม่สร้างภาพขึ้นเอง)
-    if(wantAi && !(img && img.dataURL)){
+    if(wantAi && !imgs.length){
       maruNoDots();
       maruAdd('แต่งรูปได้เฉพาะจากรูปที่แนบมานะครับ 🐤 แนบรูปสินค้าก่อน แล้วสั่ง "แต่งรูป" อีกครั้งได้เลย','er');
       return;
@@ -1880,7 +1932,7 @@ function bindMaruAssistant(currentPage){
       var r = await api('genPromoCaption', { brief:text, channels:chans });
       maruNoDots();
       if(!(r.ok && r.captions)){ maruAdd(r.error || 'สร้างไม่สำเร็จ ลองใหม่นะครับ','er'); clearAtt(); return; }
-      maruAdd('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่นไปโพสต์ได้เลย' + ((img && img.imgEl) ? ' · เลือกสไตล์โปสเตอร์ด้านล่างได้' : ''),'ai');
+      maruAdd('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่นไปโพสต์ได้เลย' + (imgs.length ? ' · เลือกสไตล์โปสเตอร์ด้านล่างได้' : ''),'ai');
       var caps = r.captions;
       var order = (r.channels && r.channels.length) ? r.channels : Object.keys(caps);
       var shown = 0;
@@ -1888,23 +1940,23 @@ function bindMaruAssistant(currentPage){
       if(!shown && caps.raw) maruAdd(String(caps.raw),'ai');
       var poster = caps.poster || {};
       // 2) โปสเตอร์/แต่งรูป — เฉพาะเมื่อมีรูปแนบเท่านั้น
-      if(img && img.imgEl){
+      if(imgs.length){
         if(wantAi){
-          maruAdd('🎨 กำลังแต่งรูปจากภาพที่แนบด้วย AI สักครู่นะครับ...','ai'); maruDots();
-          var payload = { prompt:text, imageBase64:(img.dataURL.split(',')[1] || ''), mime:(img.dataURL.match(/^data:(.*?);/) || [])[1] || 'image/jpeg' };
+          maruAdd(imgs.length>1?'🎨 กำลังรวมรูปที่แนบเป็นภาพเดียวด้วย AI สักครู่นะครับ...':'🎨 กำลังแต่งรูปจากภาพที่แนบด้วย AI สักครู่นะครับ...','ai'); maruDots();
+          var payload = { prompt:text, images: imgs.map(function(p){ return { data:(p.dataURL.split(',')[1] || ''), mime:(p.dataURL.match(/^data:(.*?);/) || [])[1] || 'image/jpeg' }; }) };
           var ir; try{ ir = await maruWithTimeout(api('genPromoImage', payload), 60000); }catch(e){ ir = { ok:false, error:'แต่งรูปนานเกินไป/เชื่อมต่อไม่ได้' }; }
           maruNoDots();
           if(ir && ir.ok && ir.image){
             var aiImg = new Image();
             aiImg.onload = function(){ maruAddPoster('ภาพแต่งด้วย AI (จากรูปที่แนบ)', ir.image); maruShowPosterPicker(aiImg, poster, chans, true); };
-            aiImg.onerror = function(){ maruAdd('โหลดภาพ AI ไม่ได้ ใช้รูปเดิมทำโปสเตอร์แทนนะครับ','er'); maruShowPosterPicker(img.imgEl, poster, chans, false); };
+            aiImg.onerror = function(){ maruAdd('โหลดภาพ AI ไม่ได้ ใช้รูปเดิมทำโปสเตอร์แทนนะครับ','er'); maruShowPosterPicker(imgs[0].imgEl, poster, chans, false); };
             aiImg.src = ir.image;
           } else {
             maruAdd((ir && ir.error) || 'แต่งรูปไม่สำเร็จ ใช้รูปเดิมทำโปสเตอร์ได้','er');
-            maruShowPosterPicker(img.imgEl, poster, chans, false);
+            maruShowPosterPicker(imgs[0].imgEl, poster, chans, false);
           }
         } else {
-          maruShowPosterPicker(img.imgEl, poster, chans, false);
+          maruShowPosterPicker(imgs[0].imgEl, poster, chans, false);
         }
       }
       // ไม่มีรูปแนบ → แคปชั่นอย่างเดียว (ไม่ทำโปสเตอร์)
@@ -1929,7 +1981,7 @@ function bindMaruAssistant(currentPage){
     if(typeof forceText !== 'string'){ maruAdd(text,'me'); inp.value=''; inp.style.height='auto'; }
     maruDots();
     try{
-      if(maruIsPromo(text) || maruPromoImg || maruWantsAiImage(text)){ await maruPromo(text); return; }
+      if(maruIsPromo(text) || maruPromoImgs.length || maruWantsAiImage(text)){ await maruPromo(text); return; }
       var owner = '';
       try{ owner = sessionStorage.getItem('maruOwner') || ''; }catch(e){}
       // เรียก AI: มี timeout 45 วิ + ลองซ้ำอัตโนมัติ 1 ครั้ง (กัน server cold start / เน็ตสะดุด)
