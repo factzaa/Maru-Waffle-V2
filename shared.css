@@ -74,6 +74,9 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFFBF0;color:var(--in
 .sb-item .si-img{width:30px;height:30px;object-fit:contain;flex:none;}
 .sb-item .si svg{width:22px;height:22px;}
 .sb-group{padding:18px 14px 6px;font-size:11px;color:#A8997C;font-weight:700;text-transform:uppercase;letter-spacing:.6px;}
+.sb-card{margin:12px 4px;border:1px solid #F0E8D6;border-radius:13px;background:#FFFDF7;overflow:hidden;}
+.sb-cap{padding:9px 13px 7px;font-size:11px;color:#A8997C;font-weight:700;letter-spacing:.5px;background:#FBF5E6;}
+.sb-card .sb-item{margin-bottom:0;border-radius:0;border-top:1px solid #F3EBD6;}
 .sb-foot{padding:14px 22px 22px;border-top:1px solid #F0E8D6;font-size:11px;color:#A8997C;}
 
 /* Receipt picker bottom sheet (สำหรับหน้ารับของ) */

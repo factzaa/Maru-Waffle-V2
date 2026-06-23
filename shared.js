@@ -1149,11 +1149,22 @@ function buildSidebar(currentPage){
     { page:'assistant',      href:'assistant.html',       icon:'chat',        label:'ผู้ช่วยมารุ' },
     { page:'manual',         href:'manual.html',          icon:'book',    label:'คู่มือการใช้งาน' },
   ];
-  return items.map(function(it){
-    if(it.group) return '<div class="sb-group">'+it.group+'</div>';
+  function itemHtml(it){
     const active = it.page === currentPage ? ' active' : '';
     return '<a class="sb-item'+active+'" href="'+it.href+'"><span class="si" data-icon="'+it.icon+'"></span>'+it.label+'</a>';
-  }).join('');
+  }
+  var html = '', inCard = false;
+  items.forEach(function(it){
+    if(it.group){
+      if(inCard) html += '</div>';
+      html += '<div class="sb-card"><div class="sb-cap">'+it.group+'</div>';
+      inCard = true;
+    } else {
+      html += itemHtml(it);
+    }
+  });
+  if(inCard) html += '</div>';
+  return html;
 }
 
 // ---- Service Worker ----
