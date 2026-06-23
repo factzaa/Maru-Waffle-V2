@@ -126,7 +126,7 @@ function apiSWR(action, params, onData){
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
 const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
-const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1, notifyLine:1, ttsSpeak:1 };
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1, notifyLine:1, ttsSpeak:1, execStockWrite:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -1219,6 +1219,15 @@ function maruAssistantMarkup(currentPage){
    + '.maru-cap-h{font-weight:700;color:#C8901A;font-size:13px;margin-bottom:4px;font-family:"Kanit";}'
    + '.maru-cap-b{white-space:pre-wrap;color:#1A1A1A;font-size:14px;line-height:1.5;font-family:"Sarabun";}'
    + '.maru-cap-copy{margin-top:8px;background:#FFC629;border:none;border-radius:999px;padding:5px 14px;font-weight:700;font-size:13px;cursor:pointer;font-family:"Sarabun";color:#1A1A1A;}'
+   + '.maru-act{align-self:stretch;background:#fff;border:1.5px solid #F2D58A;border-radius:14px;padding:12px 14px;box-shadow:0 2px 8px rgba(120,86,0,.12);}'
+   + '.maru-act .ah{font-family:"Kanit";font-weight:700;font-size:14px;color:#1A1A1A;margin-bottom:6px;}'
+   + '.maru-act .ab{font-size:14px;color:#1A1A1A;margin-bottom:8px;}'
+   + '.maru-act input{width:100%;box-sizing:border-box;border:1.5px solid #E8DFC4;border-radius:10px;padding:9px 11px;font-family:"Sarabun";font-size:14px;margin-bottom:9px;}'
+   + '.maru-act .abtn{display:flex;gap:8px;}'
+   + '.maru-act .abtn button{flex:1;border:0;border-radius:10px;padding:10px;font-family:"Kanit";font-weight:700;font-size:14px;cursor:pointer;}'
+   + '.maru-act .aok{background:#15803D;color:#fff;}'
+   + '.maru-act .acancel{background:#F2EEDD;color:#5A5247;}'
+   + '.maru-act .amsg{font-size:12.5px;margin-top:7px;}'
    + '.maru-poster{align-self:flex-start;max-width:92%;display:flex;flex-direction:column;}'
    + '.maru-poster img{width:100%;max-width:300px;border-radius:12px;border:1px solid #ECE6D6;display:block;}'
    + '.maru-poster .pl{font-size:12px;color:#8A8170;margin:5px 2px 2px;font-family:"Sarabun";}'
@@ -1723,6 +1732,28 @@ async function maruBuildContext(message){
 }
 window.maruBuildContext = maruBuildContext;
 
+function maruRenderActionCard(pa){
+  var msgs = document.getElementById('maruMsgs'); if(!msgs) return;
+  var kindTxt = pa.kind === 'receive' ? 'รับเข้า' : 'เบิก';
+  function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  var w = document.createElement('div'); w.className = 'maru-act';
+  w.innerHTML = '<div class="ah">📋 ยืนยัน'+kindTxt+'</div>'
+    + '<div class="ab"><b>'+esc(pa.item_name)+'</b> · จำนวน '+esc(pa.qty)+' '+esc(pa.unit||'')+'</div>'
+    + '<input class="aname" type="text" placeholder="ชื่อผู้ทำรายการ" value="'+esc(pa.recordedBy||'')+'">'
+    + '<div class="abtn"><button class="aok">✓ ยืนยัน'+kindTxt+'</button><button class="acancel">ยกเลิก</button></div>'
+    + '<div class="amsg"></div>';
+  msgs.appendChild(w); msgs.scrollTop = msgs.scrollHeight;
+  var nameInp = w.querySelector('.aname'), okBtn = w.querySelector('.aok'), cancelBtn = w.querySelector('.acancel'), msg = w.querySelector('.amsg'), btns = w.querySelector('.abtn');
+  cancelBtn.addEventListener('click', function(){ btns.style.display='none'; msg.style.color='#9A8C6E'; msg.textContent='ยกเลิกแล้ว'; });
+  okBtn.addEventListener('click', function(){
+    var by = (nameInp.value||'').trim(); if(!by){ msg.style.color='#B91C1C'; msg.textContent='กรุณากรอกชื่อผู้ทำรายการ'; return; }
+    okBtn.disabled = true; cancelBtn.disabled = true; okBtn.textContent = 'กำลังบันทึก...';
+    api('execStockWrite', { kind:pa.kind, itemId:pa.item_id, qty:pa.qty, recordedBy:by, note:pa.note||'' })
+      .then(function(res){ if(res && res.ok){ btns.style.display='none'; msg.style.color='#15803D'; msg.textContent='✓ '+(res.msg||'บันทึกแล้ว'); } else { okBtn.disabled=false; cancelBtn.disabled=false; okBtn.textContent='✓ ยืนยัน'+kindTxt; msg.style.color='#B91C1C'; msg.textContent=(res&&res.error)||'บันทึกไม่สำเร็จ'; } })
+      .catch(function(e){ okBtn.disabled=false; cancelBtn.disabled=false; okBtn.textContent='✓ ยืนยัน'+kindTxt; msg.style.color='#B91C1C'; msg.textContent='ผิดพลาด: '+(e.message||e); });
+  });
+}
+
 function bindMaruAssistant(currentPage){
   if(currentPage === 'assistant') return;
   var fab = document.getElementById('maruFab');
@@ -2020,7 +2051,7 @@ function bindMaruAssistant(currentPage){
         maruHistory.push({role:'user',text:text});
         maruHistory.push({role:'model',text:r.reply});
         if(maruHistory.length>24) maruHistory = maruHistory.slice(-24);
-        var __show = function(){ maruAdd(r.reply,'ai'); };
+        var __show = function(){ maruAdd(r.reply,'ai'); if(r.pendingAction){ maruRenderActionCard(r.pendingAction); } };
         if(localStorage.getItem('maruMute') === '1'){ __show(); }
         else if(localStorage.getItem('maruGeminiVoice') === '1'){ maruDots(); maruTtsGemini(r.reply, function(){ maruNoDots(); __show(); }); }   // รอเสียงพร้อม แล้วโชว์ข้อความ+เล่นพร้อมกัน
         else { __show(); maruDeviceSpeak(maruCleanForSpeech(r.reply)); }
