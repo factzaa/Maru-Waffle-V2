@@ -218,9 +218,12 @@
 
   // เขียนทับ api() ของ records ทั้งหมด → ทุก action วิ่งเข้า Supabase เท่านั้น (ตัดขาด Apps Script)
   window.SB_ACTIONS = ACTIONS;
+  var _sharedApi = window.api;   // api เดิมจาก shared.js (Supabase reads + Edge เช่น notifyLine/getAlerts)
   window.api = async function (action, params) {
     if (ACTIONS[action]) return ACTIONS[action](params || {});
-    throw new Error('v2 ยังไม่รองรับ action นี้ (ตัดจาก Apps Script แล้ว): ' + action);
+    // action อื่น (เช่น notifyLine → Edge) ส่งต่อให้ api เดิมของ shared.js
+    if (typeof _sharedApi === 'function') return _sharedApi(action, params);
+    throw new Error('v2 ยังไม่รองรับ action นี้: ' + action);
   };
   console.log('✅ sb-data.js โหลดแล้ว — records ใช้ Supabase ล้วน (ตัด Apps Script)');
 })();
