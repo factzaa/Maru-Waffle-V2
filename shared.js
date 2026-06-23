@@ -1115,6 +1115,28 @@ function bindReceiptSheet(){
 }
 
 // ---- HTML snippets (sidebar / hamburger / receipt sheet) ----
+// แสดงเวอร์ชันแอป (อ่านจาก Service Worker cache จริง — รู้ว่าอัปเดตหรือยัง)
+function maruShowVersion(){
+  try{
+    var put = function(v){
+      var els = document.querySelectorAll('.sb-foot');
+      for(var i=0;i<els.length;i++){
+        if(els[i].querySelector('.appver')) continue;
+        var d = document.createElement('div'); d.className='appver';
+        d.style.cssText='margin-top:5px;opacity:.65;font-size:10.5px;';
+        d.textContent = v ? ('เวอร์ชัน ' + v) : '';
+        els[i].appendChild(d);
+      }
+    };
+    if(!('caches' in window)){ put(''); return; }
+    caches.keys().then(function(keys){
+      var best=0, bv='';
+      keys.forEach(function(k){ var m=String(k).match(/maru-waffle-v(\d+)/); if(m){ var n=parseInt(m[1],10); if(n>best){ best=n; bv='v'+n; } } });
+      put(bv);
+    }).catch(function(){ put(''); });
+  }catch(e){}
+}
+
 // เรียก injectShell(currentPage) เพื่อใส่ HTML ส่วน sidebar + hamburger + toast + receipt sheet
 function injectShell(currentPage){
   const html = ''
@@ -1147,6 +1169,7 @@ function injectShell(currentPage){
     + '<div class="toast" id="toast"></div>';
   document.body.insertAdjacentHTML('afterbegin', html);
   renderIcons();
+  maruShowVersion();
   bindSidebar();
   bindReceiptSheet();
   bindMaruAssistant(currentPage);
