@@ -1185,7 +1185,7 @@ const BRAND_LOGOS = {
 
   // date change -> load existing report
   document.getElementById('rDate').addEventListener('change',function(){ loadReportForDate(this.value); });
-  function loadReportForDate(date){
+  function loadReportForDate(date, silent){
     const fillReport = function(rep){
       const s=rep.sales;
       CONFIG.channels.forEach(function(c){document.getElementById('inp_'+c.key).value = s? (s[c.key]||'') : '';});
@@ -1199,7 +1199,7 @@ const BRAND_LOGOS = {
       if(rep.expenses && rep.expenses.length){ rep.expenses.forEach(function(e){addExpenseItem(e);}); }
       else { addExpenseItem(); }
       recalc(); loadingDate=false;
-      if(s) toast('โหลดรายงานของวันนี้ที่เคยบันทึกไว้');
+      if(s && !silent) toast('โหลดรายงานของวันนี้ที่เคยบันทึกไว้');
     };
     loadingDate=true;
     api('getDailyReport',{date:date})
@@ -1306,8 +1306,9 @@ const BRAND_LOGOS = {
     btn.disabled=true; btn.textContent='กำลังบันทึก...';
     api('saveDailyReport',{data:{date:date,sales:sales,note:document.getElementById('rNote').value,expenses:expClean,recon:recon}})
       .then(function(res){
-        toast(res.msg||'บันทึกแล้ว ✓'); btn.disabled=false; btn.textContent=origText;
-        loadReportForDate(date);
+        btn.disabled=false; btn.textContent=origText;
+        loadReportForDate(date, true);
+        toast(res.msg||'บันทึกแล้ว ✓');
       })
       .catch(function(err){ toast('ผิดพลาด: '+err.message); btn.disabled=false; btn.textContent=origText; });
   }
