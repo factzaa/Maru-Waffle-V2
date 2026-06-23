@@ -66,6 +66,7 @@
         <button class="stock-cat-chip" data-cat="Drink">🥤 Drink</button>
         <button class="stock-cat-chip" data-cat="Other">📦 อื่นๆ</button>
         <button class="stock-cat-chip" data-cat="low" style="background:#FEF3C7;border-color:#FCD34D;color:#92400E;">⚠️ ของใกล้หมด</button>
+        <button class="stock-cat-chip" data-cat="out" style="background:#FEE2E2;border-color:#FCA5A5;color:#B91C1C;">🚫 ของหมด</button>
       </div>
 
       <div class="stock-list" id="stockList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
@@ -103,12 +104,21 @@ function renderStockSummary(){
 function renderStockList(){
   const q = (stockData.filter.q || '').toLowerCase();
   const cat = stockData.filter.cat;
+  const CAT_ORDER = { Waffle:0, KUFF:1, Drink:2, Other:3 };
   const filtered = stockData.items.filter(function(it){
     if(!it.active) return false;
-    if(cat === 'low')      { if(!it.lowStock && it.balance > 0) return false; }
+    if(cat === 'low')      { if(!(it.lowStock && it.balance > 0)) return false; }   // ใกล้หมด (ยังไม่หมด)
+    else if(cat === 'out') { if(it.balance > 0) return false; }                     // หมดสต๊อก
     else if(cat !== 'all') { if(it.category !== cat) return false; }
     if(q && it.name.toLowerCase().indexOf(q) < 0) return false;
     return true;
+  });
+  // เรียงตามหมวด (ตามลำดับ chip) แล้วตามรหัสสินค้า
+  filtered.sort(function(a,b){
+    const ra = (CAT_ORDER[a.category] !== undefined ? CAT_ORDER[a.category] : 9);
+    const rb = (CAT_ORDER[b.category] !== undefined ? CAT_ORDER[b.category] : 9);
+    if(ra !== rb) return ra - rb;
+    return String(a.id||'').localeCompare(String(b.id||''), undefined, { numeric:true });
   });
   const box = document.getElementById('stockList');
   if(!filtered.length){
