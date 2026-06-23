@@ -49,6 +49,10 @@
 .att-chip img{width:38px;height:38px;border-radius:8px;object-fit:cover;flex:none;}
 .att-chip span{flex:1;min-width:0;font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .att-chip button{border:0;background:#F2EEDD;color:var(--ink-2);width:24px;height:24px;border-radius:50%;cursor:pointer;flex:none;font-size:13px;}
+.att-chip .att-thumbs{display:flex;gap:6px;flex-wrap:wrap;flex:1;min-width:0;}
+.att-chip .athumb{position:relative;width:44px;height:44px;flex:none;}
+.att-chip .athumb img{width:100%;height:100%;border-radius:8px;object-fit:cover;}
+.att-chip .athumb button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#1A1A1A;color:#fff;border:0;font-size:10px;line-height:1;cursor:pointer;padding:0;}
 .cap-card{align-self:stretch;background:#fff;border:1px solid var(--line);border-radius:13px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.04);}
 .cap-h{font-family:'Kanit';font-weight:700;font-size:13px;color:var(--ink-2);margin-bottom:6px;}
 .cap-b{font-size:13.5px;color:var(--ink);line-height:1.55;white-space:pre-wrap;}
@@ -108,11 +112,12 @@
         </div>
       </div>
       <div class="att-chip" id="attChip">
-        <img id="attThumb" alt=""><span id="attName">รูปแนบ</span><button id="attRm" type="button" aria-label="ลบรูป">✕</button>
+        <div class="att-thumbs" id="attThumbs"></div>
+        <button id="attRm" type="button" aria-label="ลบทั้งหมด" title="ลบทั้งหมด">✕</button>
       </div>
       <div class="inbar">
         <button class="att-btn" id="attBtn" type="button" title="แนบรูปทำโพสต์">📎</button>
-        <input type="file" accept="image/*" id="imgInput" style="display:none">
+        <input type="file" accept="image/*" id="imgInput" multiple style="display:none">
         <textarea id="inp" rows="1" placeholder="พิมพ์ข้อความ... หรือแนบรูป 📎 ทำโพสต์"></textarea>
         <button class="sendb" id="send">➤</button>
       </div>
@@ -130,12 +135,23 @@ const msgsEl = $('msgs'), inp = $('inp'), sendBtn = $('send');
 let history = [];   // {role:'user'|'model', text}
 let busy = false;
 // ===== แนบรูป / ทำโพสต์การตลาด =====
-let promoImg = null;   // { imgEl, dataURL, name }
+let promoImgs = [];   // [{ imgEl, dataURL, name }]
+const MAX_IMGS = 3;
 const CHAN_LABEL = { facebook:'Facebook', line:'LINE', instagram:'Instagram', tiktok:'TikTok' };
 function chansFrom(t){ var c=[]; if(/เฟส|เฟซ|facebook|\bfb\b/i.test(t))c.push('facebook'); if(/ไลน์|line/i.test(t))c.push('line'); if(/ไอจี|\big\b|instagram|อินสตา/i.test(t))c.push('instagram'); if(/ติ๊?กต็?อก|ติ้กต็อก|tiktok/i.test(t))c.push('tiktok'); return c; }
 function wantsAi(t){ return /วาดรูป|วาดภาพ|สร้างภาพ|แต่งรูป|แต่งภาพ|ทำภาพใหม่|ภาพใหม่|ภาพ ?ai|ai ?image|เจน(เนอ)?เรท|ออกแบบภาพ|ครีเอทภาพ|แต่งฉาก/i.test(t); }
-function isPromo(t){ return /ทำโพสต์|สร้างโพสต์|ขอโพสต์|แคปชั่น|caption|โพสต์ขาย|โพสต์โปร|ทำโฆษณา|เขียนโฆษณา|โปรโมชั่น/i.test(t); }
-function clearAtt(){ promoImg=null; var chip=$('attChip'); if(chip) chip.classList.remove('show'); }
+function isPromo(t){ return /ทำโพสต์|สร้างโพสต์|ขอโพสต์|เขียนโพสต์|โพสต์ขาย|โพสต์โปร|โพสต์ลง|ลงโพสต์|แคปชั่น|caption|ทำโฆษณา|เขียนโฆษณา|ทำโปสเตอร์|ทำป้ายโปร|ลงเฟส|ลงเพจ|ลงไอจี|ลงไลน์|ลง ?ig|ลง ?fb/i.test(t); }
+function clearAtt(){ promoImgs=[]; var chip=$('attChip'); if(chip) chip.classList.remove('show'); var box=$('attThumbs'); if(box) box.innerHTML=''; }
+function renderAttThumbs(){
+  var box=$('attThumbs'); if(!box) return; box.innerHTML='';
+  promoImgs.forEach(function(p, idx){
+    var w=document.createElement('div'); w.className='athumb';
+    var im=document.createElement('img'); im.src=p.dataURL; w.appendChild(im);
+    var b=document.createElement('button'); b.type='button'; b.textContent='✕';
+    b.addEventListener('click', function(){ promoImgs.splice(idx,1); renderAttThumbs(); if(!promoImgs.length){ var c=$('attChip'); if(c) c.classList.remove('show'); } });
+    w.appendChild(b); box.appendChild(w);
+  });
+}
 
 // textarea auto-grow
 inp.addEventListener('input', function(){ inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,120)+'px'; });
@@ -148,10 +164,19 @@ $('chips').querySelectorAll('.chip').forEach(function(c){
 });
 $('attBtn').addEventListener('click', function(){ $('imgInput').click(); });
 $('imgInput').addEventListener('change', function(){
-  var fl=this.files&&this.files[0]; this.value=''; if(!fl) return;
-  var rd=new FileReader();
-  rd.onload=function(){ var im=new Image(); im.onload=function(){ promoImg={imgEl:im,dataURL:rd.result,name:fl.name||'รูปแนบ'}; $('attThumb').src=rd.result; $('attName').textContent=fl.name||'รูปแนบ'; $('attChip').classList.add('show'); if(!window.__maruAttHinted){ window.__maruAttHinted=true; addMsg('แนบรูปแล้ว 🐤 พิมพ์สิ่งที่อยากได้ เช่น "ทำโพสต์ลด 20% ลงเฟส" แล้วเลือกสไตล์โปสเตอร์ · หรือพิมพ์ "แต่งรูป" ให้ AI แต่งภาพจากรูปนี้','ai'); } }; im.src=rd.result; };
-  rd.readAsDataURL(fl);
+  var files=this.files; this.value='';
+  if(!files || !files.length) return;
+  Array.prototype.slice.call(files).forEach(function(fl){
+    if(promoImgs.length>=MAX_IMGS) return;
+    var rd=new FileReader();
+    rd.onload=function(){ var im=new Image(); im.onload=function(){
+      if(promoImgs.length>=MAX_IMGS) return;
+      promoImgs.push({ imgEl:im, dataURL:rd.result, name:fl.name||'รูปแนบ' });
+      $('attChip').classList.add('show'); renderAttThumbs();
+      if(!window.__maruAttHinted){ window.__maruAttHinted=true; addMsg('แนบรูปแล้ว 🐤 พิมพ์สิ่งที่อยากได้ เช่น "ทำโพสต์ลด 20% ลงเฟส" · แนบได้หลายรูป (สูงสุด 3) แล้วพิมพ์ "แต่งรูป" ให้ AI รวมเป็นภาพเดียว เช่น โปร "ซื้อ 2 แถม 1"','ai'); }
+    }; im.src=rd.result; };
+    rd.readAsDataURL(fl);
+  });
 });
 $('attRm').addEventListener('click', clearAtt);
 
@@ -168,30 +193,30 @@ function showMarketingHelp(){
 }
 async function runPromo(text){
   var chans=chansFrom(text), wantAi=wantsAi(text);
-  if(wantAi && !promoImg){ addMsg('แต่งรูปได้เฉพาะจากรูปที่แนบมานะครับ 🐤 แนบรูปสินค้าก่อน แล้วสั่ง "แต่งรูป" อีกครั้งได้เลย','err'); return; }
+  if(wantAi && !promoImgs.length){ addMsg('แต่งรูปได้เฉพาะจากรูปที่แนบมานะครับ 🐤 แนบรูปสินค้าก่อน แล้วสั่ง "แต่งรูป" อีกครั้งได้เลย','err'); return; }
   showTyping();
   try{
     var r=await api('genPromoCaption', { brief:text, channels:chans });
     hideTyping();
     if(!(r&&r.ok&&r.captions)){ addMsg((r&&r.error)||'สร้างไม่สำเร็จ ลองใหม่นะครับ','err'); clearAtt(); return; }
-    addMsg('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่นไปโพสต์ได้เลย'+(promoImg?' · เลือกสไตล์โปสเตอร์ด้านล่างได้':''),'ai');
+    addMsg('นี่คือโพสต์ที่ร่างให้ครับ 🐤 คัดลอกแคปชั่นไปโพสต์ได้เลย'+(promoImgs.length?' · เลือกสไตล์โปสเตอร์ด้านล่างได้':''),'ai');
     var caps=r.captions, order=(r.channels&&r.channels.length)?r.channels:Object.keys(caps), shown=0;
     order.forEach(function(ch){ if(ch==='poster'||ch==='raw')return; if(caps[ch]){ addCaption(CHAN_LABEL[ch]||ch, String(caps[ch])); shown++; } });
     if(!shown && caps.raw) addMsg(String(caps.raw),'ai');
     var poster=caps.poster||{};
-    if(promoImg){
+    if(promoImgs.length){
       if(wantAi){
-        addMsg('🎨 กำลังแต่งรูปจากภาพที่แนบด้วย AI สักครู่นะครับ...','ai'); showTyping();
-        var payload={ prompt:text, imageBase64:(promoImg.dataURL.split(',')[1]||''), mime:(promoImg.dataURL.match(/^data:(.*?);/)||[])[1]||'image/jpeg' };
+        addMsg(promoImgs.length>1?'🎨 กำลังรวมรูปที่แนบเป็นภาพเดียวด้วย AI สักครู่นะครับ...':'🎨 กำลังแต่งรูปจากภาพที่แนบด้วย AI สักครู่นะครับ...','ai'); showTyping();
+        var payload={ prompt:text, images: promoImgs.map(function(p){ return { data:(p.dataURL.split(',')[1]||''), mime:(p.dataURL.match(/^data:(.*?);/)||[])[1]||'image/jpeg' }; }) };
         var ir; try{ ir=await awTimeout(api('genPromoImage',payload),60000); }catch(e){ ir={ok:false,error:'แต่งรูปนานเกินไป/เชื่อมต่อไม่ได้'}; }
         hideTyping();
         if(ir&&ir.ok&&ir.image){
           var aiImg=new Image();
           aiImg.onload=function(){ addPoster('ภาพแต่งด้วย AI (จากรูปที่แนบ)', ir.image); showPosterPicker(aiImg, poster, chans); };
-          aiImg.onerror=function(){ addMsg('โหลดภาพ AI ไม่ได้ ใช้รูปเดิมทำโปสเตอร์แทนนะครับ','err'); showPosterPicker(promoImg.imgEl, poster, chans); };
+          aiImg.onerror=function(){ addMsg('โหลดภาพ AI ไม่ได้ ใช้รูปเดิมทำโปสเตอร์แทนนะครับ','err'); showPosterPicker(promoImgs[0].imgEl, poster, chans); };
           aiImg.src=ir.image;
-        } else { addMsg((ir&&ir.error)||'แต่งรูปไม่สำเร็จ ใช้รูปเดิมทำโปสเตอร์ได้','err'); showPosterPicker(promoImg.imgEl, poster, chans); }
-      } else { showPosterPicker(promoImg.imgEl, poster, chans); }
+        } else { addMsg((ir&&ir.error)||'แต่งรูปไม่สำเร็จ ใช้รูปเดิมทำโปสเตอร์ได้','err'); showPosterPicker(promoImgs[0].imgEl, poster, chans); }
+      } else { showPosterPicker(promoImgs[0].imgEl, poster, chans); }
     }
   }catch(e){ hideTyping(); addMsg('เชื่อมต่อไม่ได้ ลองใหม่นะครับ','err'); }
   clearAtt();
@@ -271,7 +296,7 @@ async function doSend(forceText){
   busy=true; sendBtn.disabled=true;
   let handedOff=false;
   if(typeof forceText!=='string'){ addMsg(text,'me'); inp.value=''; inp.style.height='auto'; }
-  if(promoImg || isPromo(text) || wantsAi(text)){
+  if(promoImgs.length || isPromo(text) || wantsAi(text)){
     try{ await runPromo(text); } finally { busy=false; sendBtn.disabled=false; }
     return;
   }
