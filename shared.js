@@ -269,12 +269,15 @@ function sbStockForecast(T, windowDays){
     const b = balMap[id] ? balMap[id].balance : 0;
     const avgDaily = Math.round(((wWin[id]||0)/opDays)*100)/100;
     const daysLeft = avgDaily>0 ? Math.floor(b/avgDaily) : null;
+    const suggestedMin = avgDaily>0 ? Math.ceil(avgDaily*3) : null;   // ค่าแนะนำ min stock = ใช้ ~3 วัน
+    // สถานะหลัก = อัตราใช้/วันเบิกจริง (out / critical≤3วัน / low≤7วัน / ok)
     let status;
     if(b<=0) status='out';
     else if(daysLeft!=null && daysLeft<=3) status='critical';
     else if(daysLeft!=null && daysLeft<=7) status='low';
     else status='ok';
-    list.push({ id:id, name:it.name, unit:it.unit, category:it.category, balance:Math.round(b*100)/100, minStock:it.minStock, mode:it.mode, avgDaily:avgDaily, daysLeft:daysLeft, status:status, opDays:opDays });
+    const belowMin = (it.minStock>0 && b>0 && b<=it.minStock);   // กระดิ่งแยก: ต่ำกว่าจุดเตือนที่ตั้งเอง (ไม่เกี่ยวกับการคำนวณอัตรา)
+    list.push({ id:id, name:it.name, unit:it.unit, category:it.category, balance:Math.round(b*100)/100, minStock:it.minStock, mode:it.mode, avgDaily:avgDaily, daysLeft:daysLeft, suggestedMin:suggestedMin, status:status, belowMin:belowMin, opDays:opDays });
   });
   const rank={out:0,critical:1,low:2,ok:3};
   list.sort(function(a,b){
@@ -317,11 +320,13 @@ async function sbGetHomeDashboard(){
   const activeCount = fc.length;
   const lowItems = fc.filter(function(x){ return x.status==='low' || x.status==='critical'; });
   const outItems = fc.filter(function(x){ return x.status==='out'; });
+  const belowMinItems = fc.filter(function(x){ return x.belowMin; });
   const lowStockCount = lowItems.length, outOfStockCount = outItems.length;
   const outOfStockItems = outItems.map(function(x){ return { id:x.id, name:x.name, unit:x.unit }; });
   const criticalForecast = fc.filter(function(x){ return x.status==='critical'; })
     .map(function(x){ return { name:x.name, balance:x.balance, unit:x.unit, avgDaily:x.avgDaily, daysLeft:x.daysLeft }; }).slice(0,5);
-  const lowStockList = lowItems.map(function(x){ return { name:x.name, balance:x.balance, unit:x.unit, avgDaily:x.avgDaily, daysLeft:x.daysLeft, status:x.status }; });
+  const lowStockList = lowItems.map(function(x){ return { name:x.name, balance:x.balance, unit:x.unit, minStock:x.minStock, avgDaily:x.avgDaily, daysLeft:x.daysLeft, suggestedMin:x.suggestedMin, status:x.status }; });
+  const belowMinList = belowMinItems.map(function(x){ return { name:x.name, balance:x.balance, unit:x.unit, minStock:x.minStock }; });
  
   // 3) เข้างานวันนี้
   const inMap={}, outMap={};
@@ -352,7 +357,7 @@ async function sbGetHomeDashboard(){
   return {
     today:today, yesterday:yesterday,
     sales:{ yesterday:salesYesterday, avg7:Math.round(salesAvg7), sales7days:sales7days, compareYesterdayPct:compareYesterdayPct },
-    stock:{ total:activeCount, lowStock:lowStockCount, outOfStock:outOfStockCount, outOfStockItems:outOfStockItems.slice(0,5), criticalForecast:criticalForecast, lowStockList:lowStockList, forecast:fc },
+    stock:{ total:activeCount, lowStock:lowStockCount, outOfStock:outOfStockCount, belowMin:belowMinItems.length, outOfStockItems:outOfStockItems.slice(0,5), criticalForecast:criticalForecast, lowStockList:lowStockList, belowMinList:belowMinList, forecast:fc },
     attendance:{ total:totalStaff, checkedIn:checkedIn, checkedOut:checkedOut, present:present },
     expenses:{ todayTotal:expensesToday, todayCount:expensesTodayCount },
     activities:activities.slice(0,10)
@@ -539,7 +544,7 @@ async function sbGetDailyReport(p){
  
 async function sbSuggestMinStock(p){
   const lookbackDays = (p && Number(p.lookbackDays)) || 7;
-  const bufferDays = (p && Number(p.bufferDays)) || 5;
+  const bufferDays = (p && Number(p.bufferDays)) || 3;
   const T = await sbStockTables();
   const items = T.items.filter(function(r){ return r.item_id; }).map(function(r){ return { id:r.item_id }; });
   const today = new Date(), startD = new Date(today); startD.setDate(startD.getDate() - (lookbackDays - 1));
@@ -879,6 +884,7 @@ async function sbGetAlerts(){
   if(hd){
     if(hd.stock.outOfStock > 0){ var nm=(hd.stock.outOfStockItems||[]).map(function(x){return x.name;}).slice(0,5).join(', '); alerts.push({ id:'stock-out-'+today, level:'crit', icon:'🔴', title:'ของหมดสต๊อก '+hd.stock.outOfStock+' รายการ', msg:nm+(hd.stock.outOfStock>5?' และอื่นๆ':''), page:'stock-manage.html' }); }
     if(hd.stock.lowStock > 0){ var _ls=(hd.stock.lowStockList||[]); var lf=_ls.slice(0,8).map(function(x){ return x.name + (x.daysLeft!=null ? ' (เหลือ~'+x.daysLeft+'วัน)' : ' (เหลือ '+x.balance+(x.unit||'')+')'); }).join(', '); if(hd.stock.lowStock>8) lf += ' และอีก '+(hd.stock.lowStock-8)+' รายการ'; alerts.push({ id:'stock-low-'+today, level:'warn', icon:'🟡', title:'ของใกล้หมด '+hd.stock.lowStock+' รายการ', msg:lf||'ตรวจสอบและเตรียมสั่งเพิ่ม', page:'stock-manage.html' }); }
+    if(hd.stock.belowMin > 0){ var _bm=(hd.stock.belowMinList||[]); var bmf=_bm.slice(0,8).map(function(x){ return x.name + ' (เหลือ '+x.balance+(x.unit||'')+' · เตือนที่ '+x.minStock+')'; }).join(', '); if(hd.stock.belowMin>8) bmf += ' และอีก '+(hd.stock.belowMin-8)+' รายการ'; alerts.push({ id:'stock-belowmin-'+today, level:'info', icon:'🔔', title:'ต่ำกว่าจุดเตือนที่ตั้งไว้ '+hd.stock.belowMin+' รายการ', msg:bmf||'มีรายการต่ำกว่าจุดเตือน', page:'stock-manage.html' }); }
     var ysd=hd.sales.yesterday||0, avg7=hd.sales.avg7||0;
     if(avg7>0 && ysd===0) alerts.push({ id:'sales-zero-'+today, level:'crit', icon:'🔴', title:'เมื่อวานยอดขายเป็น 0', msg:'ตรวจสอบว่าบันทึกยอดครบหรือยัง', page:'index.html' });
     else if(avg7>0 && ysd>0 && ysd<avg7*0.7) alerts.push({ id:'sales-low-'+today, level:'warn', icon:'🟡', title:'ยอดเมื่อวานตกผิดปกติ', msg:'เมื่อวาน '+Math.round(ysd)+' บาท ต่ำกว่าเฉลี่ย7วัน ('+Math.round(avg7)+') เกิน 30%', page:'index.html' });
@@ -1789,14 +1795,15 @@ async function maruBuildContext(message){
   if(hd && t.stock){
     p.push('วันนี้คือ '+today+' (ใช้คำนวณจำนวนวันถึงวันเป้าหมายได้)');
     p.push('สต๊อก: ทั้งหมด '+hd.stock.total+' รายการ · ใกล้หมด '+hd.stock.lowStock+' · หมด '+hd.stock.outOfStock);
-    var _concern = (hd.stock.forecast||[]).filter(function(x){ return x.status!=='ok'; });
+    var _concern = (hd.stock.forecast||[]).filter(function(x){ return x.status!=='ok' || x.belowMin; });
     if(_concern.length){
-      p.push('รายการที่ต้องสนใจ (ชื่อ | คงเหลือ | อัตราใช้/วัน | เหลือกี่วัน | สถานะ):');
+      p.push('สถานะ "ใกล้หมด/วิกฤต" คำนวณจากอัตราใช้ต่อวันเบิกจริง (วิกฤต=เหลือ≤3วัน, ใกล้หมด=≤7วัน). ส่วน "จุดเตือน (min stock)" เป็นกระดิ่งแยกที่เจ้าของตั้งเอง — ต่ำกว่าค่านี้จะมีไอคอนเตือน 🔔 ไม่เกี่ยวกับการคำนวณอัตรา.');
+      p.push('รายการที่ต้องสนใจ (ชื่อ | คงเหลือ | อัตราใช้/วัน | เหลือกี่วัน | สถานะ | จุดเตือน):');
       _concern.slice(0,50).forEach(function(x){
         var st = {out:'หมดแล้ว',critical:'วิกฤต',low:'ใกล้หมด'}[x.status]||x.status;
-        p.push('- '+x.name+' | เหลือ '+x.balance+(x.unit?' '+x.unit:'')+' | ใช้ ~'+x.avgDaily+'/วัน | '+(x.daysLeft!=null?('เหลือ ~'+x.daysLeft+' วัน'):'ไม่มีการเบิกช่วงนี้')+' | '+st);
+        p.push('- '+x.name+' | เหลือ '+x.balance+(x.unit?' '+x.unit:'')+' | ใช้ ~'+x.avgDaily+'/วัน | '+(x.daysLeft!=null?('เหลือ ~'+x.daysLeft+' วัน'):'ไม่มีการเบิกช่วงนี้')+' | '+st+(x.belowMin?' | 🔔ต่ำกว่าจุดเตือน('+(x.minStock||0)+')':''));
       });
-      p.push('วิธีคำนวณจำนวนที่ควรสั่งให้พอถึงวันเป้าหมาย: จำนวนสั่ง = ceil(อัตราใช้/วัน × จำนวนวันจากวันนี้ถึงวันเป้าหมาย) − คงเหลือปัจจุบัน (ถ้าได้ค่าติดลบให้ตอบ 0 = ยังพอ). ของที่ไม่มีอัตราใช้ในช่วงนี้ ให้ประเมินจากจุดสั่งซื้อขั้นต่ำ/ถามผู้ใช้แทน. ตอบเป็นตารางรายตัวพร้อมจำนวนที่ควรสั่ง.');
+      p.push('วิธีคำนวณจำนวนที่ควรสั่งให้พอถึงวันเป้าหมาย: จำนวนสั่ง = ceil(อัตราใช้/วัน × จำนวนวันจากวันนี้ถึงวันเป้าหมาย) − คงเหลือปัจจุบัน (ถ้าได้ค่าติดลบให้ตอบ 0 = ยังพอ). ของที่ไม่มีอัตราใช้ในช่วงนี้ ให้ถามผู้ใช้แทน. ตอบเป็นตารางรายตัวพร้อมจำนวนที่ควรสั่ง.');
     }
   }
   if(hd && t.attend){

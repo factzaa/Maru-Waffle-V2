@@ -245,16 +245,17 @@ function render(){
 
   // === Forecast — ของที่น่าจะหมดเร็ว ===
   if (dashData.forecast.length > 0) {
-    html += '<div class="sec-card"><div class="h"><span class="em">⏰</span> ของที่ต้องสั่งเพิ่ม (ใกล้หมด/หมดเร็ว)</div>'
+    html += '<div class="sec-card"><div class="h"><span class="em">⏰</span> ของที่น่าจะหมดเร็ว (ตามอัตราใช้จริง)</div>'
       + dashData.forecast.map(function(f){
-        const st = f.status || (f.daysLeft!=null && f.daysLeft<=3 ? 'critical' : (f.daysLeft!=null && f.daysLeft<=7 ? 'low' : 'ok'));
+        const st = f.status || (f.daysLeft!=null && f.daysLeft<=3 ? 'critical' : 'low');
         const cls = (st==='out'||st==='critical') ? 'crit' : (st==='low' ? 'warn' : 'ok');
         const noRate = (f.daysLeft==null);
-        const dLabel = noRate ? '—' : (f.daysLeft >= 100 ? '100+' : f.daysLeft);
-        const dUnit  = noRate ? 'ต่ำกว่าจุดสั่ง' : 'วัน';
+        const dLabel = noRate ? '—' : (f.daysLeft>=100?'100+':f.daysLeft);
+        const dUnit  = noRate ? '' : 'วัน';
+        const bm = f.belowMin ? ' · 🔔ต่ำกว่าจุดเตือน '+(f.minStock||0) : '';
         return '<div class="fc-row '+cls+'">'
           +'<div class="info"><div class="nm">'+escHtml(f.name)+'</div>'
-            +'<div class="meta">เหลือ <b>'+f.balance+' '+escHtml(f.unit)+'</b> · เบิก '+(noRate?'0':f.avgDaily)+'/วัน</div></div>'
+            +'<div class="meta">เหลือ <b>'+f.balance+' '+escHtml(f.unit)+'</b> · ใช้ '+(noRate?'0':f.avgDaily)+'/วัน'+bm+'</div></div>'
           +'<div class="days"><div class="d">'+dLabel+'</div><div class="l">'+dUnit+'</div></div>'
         +'</div>';
       }).join('')
