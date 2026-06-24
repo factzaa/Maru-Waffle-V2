@@ -247,52 +247,50 @@ function sbComputeBalances(asOfDate, category, T){
     summary:{ total:list.length, lowStock:list.filter(function(x){return x.lowStock&&x.active;}).length, outOfStock:list.filter(function(x){return x.balance<=0&&x.active;}).length },
     asOfDate:asOfDate };
 }
+// ===== สูตรกลาง: พยากรณ์สต๊อกรายตัว (ใช้ร่วมกันทุกหน้า + มารุ) =====
+// status: out(หมด) / critical(เหลือ≤3วัน) / low(≤จุดสั่งซื้อ หรือ ≤7วัน) / ok
+// ===== สูตรกลาง: พยากรณ์สต๊อกรายตัว (ใช้ร่วมกันทุกหน้า + มารุ) =====
+// avgDaily = เบิกรวมในหน้าต่าง ÷ "จำนวนวันที่ร้านมีการเบิกจริง" (ไม่ใช่วันปฏิทิน)
+// status: out(หมด) / critical(เหลือ≤3วัน) / low(≤7วัน) / ok  — ใช้อัตราเป็นหลัก
+function sbStockForecast(T, windowDays){
+  windowDays = windowDays || 30;
+  const today = sbLocalDate();
+  const now = new Date();
+  const startW = sbFmtD(new Date(now.getTime() - (windowDays-1)*86400000));
+  const balMap = {}; sbComputeBalances(today,'all',T).items.forEach(function(b){ balMap[b.id]=b; });
+  const wWin = {}, opSet = {};
+  T.wd.forEach(function(r){ const id=r.item_id; if(!id) return; if(r.move_date>=startW && r.move_date<=today){ wWin[id]=(wWin[id]||0)+(Number(r.qty)||0); opSet[r.move_date]=1; } });
+  const opDays = Math.max(1, Object.keys(opSet).length);   // วันที่มีการเบิกจริง = ตัวหาร
+  const items = {};
+  T.items.forEach(function(r){ if(!r.item_id) return; items[r.item_id]={ id:r.item_id, name:r.name, unit:r.unit, category:r.category, minStock:Number(r.min_stock)||0, mode:r.mode||'withdraw', active:r.active!==false }; });
+  const list = [];
+  Object.keys(items).forEach(function(id){
+    const it=items[id]; if(!it.active) return;
+    const b = balMap[id] ? balMap[id].balance : 0;
+    const avgDaily = Math.round(((wWin[id]||0)/opDays)*100)/100;
+    const daysLeft = avgDaily>0 ? Math.floor(b/avgDaily) : null;
+    let status;
+    if(b<=0) status='out';
+    else if(daysLeft!=null && daysLeft<=3) status='critical';
+    else if(daysLeft!=null && daysLeft<=7) status='low';
+    else status='ok';
+    list.push({ id:id, name:it.name, unit:it.unit, category:it.category, balance:Math.round(b*100)/100, minStock:it.minStock, mode:it.mode, avgDaily:avgDaily, daysLeft:daysLeft, status:status, opDays:opDays });
+  });
+  const rank={out:0,critical:1,low:2,ok:3};
+  list.sort(function(a,b){
+    if(rank[a.status]!==rank[b.status]) return rank[a.status]-rank[b.status];
+    var da=a.daysLeft==null?1e9:a.daysLeft, db=b.daysLeft==null?1e9:b.daysLeft;
+    if(da!==db) return da-db;
+    return a.balance-b.balance;
+  });
+  return list;
+}
+
 async function sbGetStockBalances(p){
   const T = await sbStockTables();
   return sbComputeBalances((p && p.date) || sbFmtD(new Date()), (p && p.category) || 'all', T);
 }
- 
-// ---- แดชบอร์ดยอดขาย = port ของ getDashboardData เดิม ----
-async function sbGetDashboardData(p){
-  const start = p.start, end = p.end;
-  const sD = new Date(start+'T00:00:00'), eD = new Date(end+'T00:00:00');
-  const days = Math.round((eD-sD)/86400000)+1;
-  const prevEnd = new Date(sD.getTime()-86400000), prevStart = new Date(prevEnd.getTime()-(days-1)*86400000);
-  const prevStartStr = sbFmtD(prevStart), prevEndStr = sbFmtD(prevEnd);
-  const [salesRows, expRows] = await Promise.all([
-    sbFetch('sales?select=sale_date,total,cash,transfer,thaihelp,lineman,grab,shopee,robinhood,cash_diff&order=sale_date.asc'),
-    sbFetch('expenses?select=exp_date,item,amount')
-  ]);
-  const chanTotal = {}; SB_CH.forEach(function(c){ chanTotal[c.key]=0; });
-  const byDay = {}, byDow=[0,0,0,0,0,0,0], byDowCnt=[0,0,0,0,0,0,0];
-  let totalSales=0, cash=0, transfer=0, thaihelp=0, delivery=0, dayCount=0, prevTotal=0, cashDiff=0;
-  salesRows.forEach(function(r){
-    const dd = r.sale_date, dayTotal = Number(r.total)||0;
-    if(dd>=start && dd<=end){
-      totalSales += dayTotal; dayCount++; byDay[dd] = dayTotal;
-      var di = new Date(dd+'T00:00:00').getDay(); byDow[di]+=dayTotal; byDowCnt[di]++;
-      cashDiff += Number(r.cash_diff)||0;
-      SB_CH.forEach(function(c){ const v=Number(r[c.key])||0; chanTotal[c.key]+=v;
-        if(c.group==='store'){ if(c.key==='cash')cash+=v; else if(c.key==='transfer')transfer+=v; else if(c.key==='thaihelp')thaihelp+=v; } else delivery+=v; });
-    } else if(dd>=prevStartStr && dd<=prevEndStr) prevTotal += dayTotal;
-  });
-  let totalExpenses=0; const expByCat={};
-  expRows.forEach(function(r){ const dd=r.exp_date; if(dd>=start&&dd<=end){ const a=Number(r.amount)||0; totalExpenses+=a; const c=r.item||'อื่นๆ'; expByCat[c]=(expByCat[c]||0)+a; } });
-  const byDayArr = Object.keys(byDay).sort().map(function(k){ return {date:k,total:byDay[k]}; });
-  const byChannelArr = SB_CH.map(function(c){ return {label:c.label,total:chanTotal[c.key]}; }).filter(function(o){return o.total>0;}).sort(function(a,b){return b.total-a.total;});
-  const expByCatArr = Object.keys(expByCat).map(function(k){ return {category:k,total:expByCat[k]}; }).sort(function(a,b){return b.total-a.total;});
-  let bestDay=null; byDayArr.forEach(function(o){ if(!bestDay||o.total>bestDay.total) bestDay=o; });
-  function dowAvg(i){ return byDowCnt[i]>0?byDow[i]/byDowCnt[i]:0; }
-  let bestDowIdx=0; for(let i=1;i<7;i++){ if(dowAvg(i)>dowAvg(bestDowIdx)) bestDowIdx=i; }
-  return { range:{start:start,end:end},
-    summary:{ totalSales:totalSales, cash:cash, transfer:transfer, thaihelp:thaihelp, delivery:delivery,
-      totalExpenses:totalExpenses, netProfit: totalSales-totalExpenses, dayCount:dayCount, avgPerDay: dayCount?totalSales/dayCount:0,
-      prevTotal:prevTotal, growth: prevTotal>0?((totalSales-prevTotal)/prevTotal*100):null,
-      bestDay:bestDay, bestDow: byDayArr.length?SB_DOW[bestDowIdx]:null, bestDowAvg: byDayArr.length?Math.round(dowAvg(bestDowIdx)):0, cashDiff:cashDiff },
-    byChannel:byChannelArr, byDay:byDayArr, byDow:byDow, byDowCount:byDowCnt, dowNames:SB_DOW, expByCat:expByCatArr };
-}
- 
-// ---- หน้าแรก = port ของ getHomeDashboard เดิม ----
+
 async function sbGetHomeDashboard(){
   const now = new Date();
   const today = sbFmtD(now), yesterday = sbFmtD(new Date(now.getTime()-86400000)), start7 = sbFmtD(new Date(now.getTime()-6*86400000));
@@ -303,7 +301,7 @@ async function sbGetHomeDashboard(){
     sbFetch('staff_safe?select=staff_id,active'),
     sbStockTables()
   ]);
- 
+
   // 1) ยอดขาย 7 วัน
   const salesByDate = {};
   salesRows.forEach(function(r){ const d=r.sale_date; if(d>=start7&&d<=today) salesByDate[d]=(salesByDate[d]||0)+(Number(r.total)||0); });
@@ -313,28 +311,17 @@ async function sbGetHomeDashboard(){
   const nonZero = sales7days.filter(function(d){ return d.sales>0; });
   const salesAvg7 = nonZero.length ? nonZero.reduce(function(a,b){return a+b.sales;},0)/nonZero.length : 0;
   const compareYesterdayPct = salesAvg7>0 ? Math.round((salesYesterday-salesAvg7)/salesAvg7*100) : 0;
- 
-  // 2) สต๊อก (ใช้ตัวคำนวณคงเหลือเดียวกับทุกหน้า)
-  const items = {};
-  T.items.forEach(function(r){ if(!r.item_id) return; items[r.item_id]={ id:r.item_id, name:r.name, category:r.category, unit:r.unit, minStock:Number(r.min_stock)||0, mode:r.mode||'withdraw', active:r.active!==false }; });
-  const wd7Sum={}, wdSum={}, rcSum={}, wasteSum={};
-  T.wd.forEach(function(r){ const id=r.item_id, q=Number(r.qty)||0; if(!id) return; wdSum[id]=(wdSum[id]||0)+q; if(r.move_date>=start7&&r.move_date<=today) wd7Sum[id]=(wd7Sum[id]||0)+q; });
-  T.rc.forEach(function(r){ const id=r.item_id, q=Number(r.qty)||0; if(!id) return; rcSum[id]=(rcSum[id]||0)+q; });
-  T.daily.forEach(function(r){ const id=r.item_id; if(!id) return; wasteSum[id]=(wasteSum[id]||0)+(Number(r.waste)||0); });
-  const balMap = {}; sbComputeBalances(today,'all',T).items.forEach(function(b){ balMap[b.id]=b; });
-  let activeCount=0, lowStockCount=0, outOfStockCount=0; const outOfStockItems=[], itemsWithBalance=[];
-  Object.keys(items).forEach(function(id){
-    const it=items[id]; if(!it.active) return; activeCount++;
-    let bal = balMap[id]? balMap[id].balance : ((rcSum[id]||0)-(wdSum[id]||0)-(wasteSum[id]||0));
-    bal = Math.round(bal*100)/100;
-    const isOut = bal<=0, isLow = !isOut && it.minStock>0 && bal<=it.minStock;
-    if(isOut){ outOfStockCount++; outOfStockItems.push({id:id,name:it.name,unit:it.unit}); } else if(isLow) lowStockCount++;
-    itemsWithBalance.push({ id:id, name:it.name, unit:it.unit, balance:bal, wd7:wd7Sum[id]||0 });
-  });
-  const criticalForecast = itemsWithBalance.filter(function(it){ return it.wd7>0&&it.balance>0; })
-    .map(function(it){ const avgDaily=it.wd7/7, daysLeft=avgDaily>0?Math.floor(it.balance/avgDaily):999;
-      return { name:it.name, balance:it.balance, unit:it.unit, avgDaily:Math.round(avgDaily*10)/10, daysLeft:daysLeft }; })
-    .filter(function(f){ return f.daysLeft<=3; }).sort(function(a,b){ return a.daysLeft-b.daysLeft; }).slice(0,5);
+
+  // 2) สต๊อก — ใช้สูตรกลาง sbStockForecast (อัตราใช้/วันเบิกจริง, หน้าต่าง 30 วัน)
+  const fc = sbStockForecast(T, 30);
+  const activeCount = fc.length;
+  const lowItems = fc.filter(function(x){ return x.status==='low' || x.status==='critical'; });
+  const outItems = fc.filter(function(x){ return x.status==='out'; });
+  const lowStockCount = lowItems.length, outOfStockCount = outItems.length;
+  const outOfStockItems = outItems.map(function(x){ return { id:x.id, name:x.name, unit:x.unit }; });
+  const criticalForecast = fc.filter(function(x){ return x.status==='critical'; })
+    .map(function(x){ return { name:x.name, balance:x.balance, unit:x.unit, avgDaily:x.avgDaily, daysLeft:x.daysLeft }; }).slice(0,5);
+  const lowStockList = lowItems.map(function(x){ return { name:x.name, balance:x.balance, unit:x.unit, avgDaily:x.avgDaily, daysLeft:x.daysLeft, status:x.status }; });
  
   // 3) เข้างานวันนี้
   const inMap={}, outMap={};
@@ -365,7 +352,7 @@ async function sbGetHomeDashboard(){
   return {
     today:today, yesterday:yesterday,
     sales:{ yesterday:salesYesterday, avg7:Math.round(salesAvg7), sales7days:sales7days, compareYesterdayPct:compareYesterdayPct },
-    stock:{ total:activeCount, lowStock:lowStockCount, outOfStock:outOfStockCount, outOfStockItems:outOfStockItems.slice(0,5), criticalForecast:criticalForecast },
+    stock:{ total:activeCount, lowStock:lowStockCount, outOfStock:outOfStockCount, outOfStockItems:outOfStockItems.slice(0,5), criticalForecast:criticalForecast, lowStockList:lowStockList, forecast:fc },
     attendance:{ total:totalStaff, checkedIn:checkedIn, checkedOut:checkedOut, present:present },
     expenses:{ todayTotal:expensesToday, todayCount:expensesTodayCount },
     activities:activities.slice(0,10)
@@ -488,7 +475,7 @@ async function sbGetStockDashboard(p){
   const topWasted = allStats.filter(function(s){return s.wasted>0;}).sort(function(a,b){return b.wasted-a.wasted;}).slice(0,10);
   const movedIds={}; Object.keys(stats).forEach(function(id){ movedIds[id]=true; });
   const deadStock = Object.keys(itemsMap).filter(function(id){ return itemsMap[id].active!==false && !movedIds[id]; }).map(function(id){ const it=itemsMap[id]; const bal=balanceMap[id]||{balance:0}; return {id:id,name:it.name,unit:it.unit,category:it.category,balance:bal.balance}; }).filter(function(x){return x.balance>0;}).sort(function(a,b){return b.balance-a.balance;}).slice(0,10);
-  const forecast = allStats.filter(function(s){return s.wdQty>0&&s.balance>0;}).map(function(s){ const avgDaily=s.wdQty/days; const daysLeft=avgDaily>0?Math.floor(s.balance/avgDaily):999; return Object.assign({}, s, {avgDaily:Math.round(avgDaily*10)/10, daysLeft:daysLeft}); }).sort(function(a,b){return a.daysLeft-b.daysLeft;}).slice(0,10);
+  const forecast = sbStockForecast(T, 30).filter(function(x){ return x.status==='critical' || x.status==='low'; }).slice(0,15);
   const allDates={}; Object.keys(wdByDate).forEach(function(d){allDates[d]=true;}); Object.keys(rcByDate).forEach(function(d){allDates[d]=true;});
   const dailyMovement = Object.keys(allDates).sort().map(function(d){ return { date:d, dateDM:sbDM(d), withdraws:wdByDate[d]||0, receives:rcByDate[d]||0 }; });
   const dowNames=['อา.','จ.','อ.','พ.','พฤ.','ศ.','ส.'];
@@ -891,7 +878,7 @@ async function sbGetAlerts(){
   var hd = null; try{ hd = await api('getHomeDashboard', {}); }catch(e){}
   if(hd){
     if(hd.stock.outOfStock > 0){ var nm=(hd.stock.outOfStockItems||[]).map(function(x){return x.name;}).slice(0,5).join(', '); alerts.push({ id:'stock-out-'+today, level:'crit', icon:'🔴', title:'ของหมดสต๊อก '+hd.stock.outOfStock+' รายการ', msg:nm+(hd.stock.outOfStock>5?' และอื่นๆ':''), page:'stock-manage.html' }); }
-    if(hd.stock.lowStock > 0){ var lf=(hd.stock.criticalForecast||[]).map(function(x){return x.name;}).slice(0,5).join(', '); alerts.push({ id:'stock-low-'+today, level:'warn', icon:'🟡', title:'ของใกล้หมด '+hd.stock.lowStock+' รายการ', msg:lf||'ตรวจสอบและเตรียมสั่งเพิ่ม', page:'stock-manage.html' }); }
+    if(hd.stock.lowStock > 0){ var _ls=(hd.stock.lowStockList||[]); var lf=_ls.slice(0,8).map(function(x){ return x.name + (x.daysLeft!=null ? ' (เหลือ~'+x.daysLeft+'วัน)' : ' (เหลือ '+x.balance+(x.unit||'')+')'); }).join(', '); if(hd.stock.lowStock>8) lf += ' และอีก '+(hd.stock.lowStock-8)+' รายการ'; alerts.push({ id:'stock-low-'+today, level:'warn', icon:'🟡', title:'ของใกล้หมด '+hd.stock.lowStock+' รายการ', msg:lf||'ตรวจสอบและเตรียมสั่งเพิ่ม', page:'stock-manage.html' }); }
     var ysd=hd.sales.yesterday||0, avg7=hd.sales.avg7||0;
     if(avg7>0 && ysd===0) alerts.push({ id:'sales-zero-'+today, level:'crit', icon:'🔴', title:'เมื่อวานยอดขายเป็น 0', msg:'ตรวจสอบว่าบันทึกยอดครบหรือยัง', page:'index.html' });
     else if(avg7>0 && ysd>0 && ysd<avg7*0.7) alerts.push({ id:'sales-low-'+today, level:'warn', icon:'🟡', title:'ยอดเมื่อวานตกผิดปกติ', msg:'เมื่อวาน '+Math.round(ysd)+' บาท ต่ำกว่าเฉลี่ย7วัน ('+Math.round(avg7)+') เกิน 30%', page:'index.html' });
@@ -1800,13 +1787,17 @@ async function maruBuildContext(message){
     if(hd.sales.sales7days) p.push('ยอดขาย7วันล่าสุด: '+hd.sales.sales7days.map(function(x){return x.dateDM+'='+Math.round(x.sales);}).join(', '));
   }
   if(hd && t.stock){
+    p.push('วันนี้คือ '+today+' (ใช้คำนวณจำนวนวันถึงวันเป้าหมายได้)');
     p.push('สต๊อก: ทั้งหมด '+hd.stock.total+' รายการ · ใกล้หมด '+hd.stock.lowStock+' · หมด '+hd.stock.outOfStock);
-    if(hd.stock.outOfStockItems && hd.stock.outOfStockItems.length) p.push('ของหมด: '+hd.stock.outOfStockItems.map(function(x){return x.name;}).join(', '));
-    if(hd.stock.criticalForecast && hd.stock.criticalForecast.length) p.push('ใกล้หมดใน~3วัน: '+hd.stock.criticalForecast.map(function(x){return x.name+'(เหลือ~'+x.daysLeft+'วัน)';}).join(', '));
-    var buffer=3, recos=[];
-    (hd.stock.criticalForecast||[]).forEach(function(x){ var order=Math.max(0,Math.ceil((x.avgDaily||0)*buffer)-(x.balance||0)); if(order>0) recos.push(x.name+' สั่งเพิ่ม ~'+order+(x.unit?' '+x.unit:'')+' (ใช้~'+x.avgDaily+'/วัน เหลือ~'+x.daysLeft+'วัน)'); });
-    try{ var sm=await api('suggestMinStock',{lookbackDays:7,bufferDays:buffer}); (hd.stock.outOfStockItems||[]).forEach(function(o){ var det=sm.detail&&sm.detail[o.id], avg=det?det.avgDaily:0; var order=(sm.suggestions&&sm.suggestions[o.id])||(avg?Math.ceil(avg*buffer):0); recos.push(o.name+' (หมดแล้ว) สั่ง ~'+(order||'-')+(o.unit?' '+o.unit:'')+(avg?' (ใช้~'+avg+'/วัน)':'')); }); }catch(e){}
-    if(recos.length) p.push('คำแนะนำปริมาณสั่ง (~'+buffer+' วัน): '+recos.join('; '));
+    var _concern = (hd.stock.forecast||[]).filter(function(x){ return x.status!=='ok'; });
+    if(_concern.length){
+      p.push('รายการที่ต้องสนใจ (ชื่อ | คงเหลือ | อัตราใช้/วัน | เหลือกี่วัน | สถานะ):');
+      _concern.slice(0,50).forEach(function(x){
+        var st = {out:'หมดแล้ว',critical:'วิกฤต',low:'ใกล้หมด'}[x.status]||x.status;
+        p.push('- '+x.name+' | เหลือ '+x.balance+(x.unit?' '+x.unit:'')+' | ใช้ ~'+x.avgDaily+'/วัน | '+(x.daysLeft!=null?('เหลือ ~'+x.daysLeft+' วัน'):'ไม่มีการเบิกช่วงนี้')+' | '+st);
+      });
+      p.push('วิธีคำนวณจำนวนที่ควรสั่งให้พอถึงวันเป้าหมาย: จำนวนสั่ง = ceil(อัตราใช้/วัน × จำนวนวันจากวันนี้ถึงวันเป้าหมาย) − คงเหลือปัจจุบัน (ถ้าได้ค่าติดลบให้ตอบ 0 = ยังพอ). ของที่ไม่มีอัตราใช้ในช่วงนี้ ให้ประเมินจากจุดสั่งซื้อขั้นต่ำ/ถามผู้ใช้แทน. ตอบเป็นตารางรายตัวพร้อมจำนวนที่ควรสั่ง.');
+    }
   }
   if(hd && t.attend){
     p.push('เข้างานวันนี้: เข้า '+hd.attendance.checkedIn+'/'+hd.attendance.total+' คน · ออกแล้ว '+hd.attendance.checkedOut+' · กำลังอยู่ '+hd.attendance.present.length);
