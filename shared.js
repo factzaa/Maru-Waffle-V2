@@ -126,7 +126,7 @@ function apiSWR(action, params, onData){
 const SB_URL = 'https://sfdahyvekfcxoprkshko.supabase.co';
 const SB_KEY = 'sb_publishable_632DkQ4uOHjIGWr-_c7hCA_WgFHe3jT';
 const EDGE_URL = SB_URL + '/functions/v1/secure-api';   // Edge Function สำหรับ action อ่อนไหว (เงินเดือน/พนักงาน)
-const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1, notifyLine:1, ttsSpeak:1, execStockWrite:1 };
+const EDGE_ACTIONS = { getPayrollStatus:1, markPaid:1, getStaffDetail:1, verifyStaffPin:1, saveAttendStaff:1, askAI:1, genPromoCaption:1, genPromoImage:1, confirmRemit:1, notifyLine:1, ttsSpeak:1, execStockWrite:1, editStockMovement:1 };
 const SB_CH = [
   { key:'cash', label:'เงินสด', group:'store' },
   { key:'transfer', label:'เงินโอน', group:'store' },
@@ -1209,6 +1209,68 @@ function buildSidebar(currentPage){
   });
   if(inCard) html += '</div>';
   return html;
+}
+
+// ---- รายการล่าสุด (แก้ไข/ลบ) ใช้ร่วมหน้าเบิก/รับ ----
+async function mountMoveLog(kind, mount){
+  if(!mount) return;
+  var table = kind==='receive' ? 'stock_receive' : 'stock_withdraw';
+  var title = kind==='receive' ? 'รายการรับเข้าล่าสุด' : 'รายการเบิกล่าสุด';
+  var today = sbLocalDate();
+  mount.innerHTML = '<div class="mlog">'
+    + '<div class="mlog-h"><span>🧾 '+title+'</span><input type="date" class="mlog-date" value="'+today+'"></div>'
+    + '<div class="mlog-body"><div class="mlog-empty">กำลังโหลด...</div></div>'
+    + '</div>';
+  var dateEl = mount.querySelector('.mlog-date');
+  var bodyEl = mount.querySelector('.mlog-body');
+  async function loadRows(){
+    var d = dateEl.value || today;
+    bodyEl.innerHTML = '<div class="mlog-empty">กำลังโหลด...</div>';
+    try{
+      var sel = kind==='receive' ? 'id,item_name,qty,note,created_at' : 'id,item_name,qty,move_time,note,created_at';
+      var rows = await sbFetch(table+'?select='+sel+'&move_date=eq.'+encodeURIComponent(d)+'&order=created_at.desc');
+      if(!rows.length){ bodyEl.innerHTML = '<div class="mlog-empty">ไม่มีรายการในวันนี้</div>'; return; }
+      bodyEl.innerHTML = rows.map(function(r){
+        var isAuto = String(r.note||'').indexOf('เบิกอัตโนมัติจากการนับปิดรอบ')===0;
+        var tm = (kind==='withdraw' && r.move_time) ? (String(r.move_time).slice(0,5)+' · ') : '';
+        var act = isAuto
+          ? '<span class="mlog-auto">อัตโนมัติ</span>'
+          : '<button class="mlog-b edit" data-id="'+r.id+'" data-qty="'+r.qty+'" data-name="'+escHtml(r.item_name||'')+'">แก้</button>'
+            + '<button class="mlog-b del" data-id="'+r.id+'" data-name="'+escHtml(r.item_name||'')+'">ลบ</button>';
+        return '<div class="mlog-row"><div class="mlog-info"><div class="mlog-nm">'+escHtml(r.item_name||'')+'</div>'
+          + '<div class="mlog-meta">'+tm+'จำนวน '+r.qty+'</div></div><div class="mlog-act">'+act+'</div></div>';
+      }).join('');
+    }catch(e){ bodyEl.innerHTML = '<div class="mlog-empty">โหลดไม่ได้: '+escHtml(e.message||e)+'</div>'; }
+  }
+  async function act(id, op, name, curQty){
+    var qty;
+    if(op==='edit'){
+      var input = window.prompt('แก้จำนวน "'+name+'" (เดิม '+curQty+')', curQty);
+      if(input===null) return;
+      qty = parseFloat(input);
+      if(!(qty>=0)){ toast('จำนวนไม่ถูกต้อง'); return; }
+    } else {
+      if(!confirm('ลบรายการ "'+name+'" ออกจากระบบ?')) return;
+    }
+    async function call(code){ return await api('editStockMovement', { kind:kind, id:id, op:op, qty:qty, ownerCode:code||'' }); }
+    var res;
+    try{ res = await call(''); }catch(e){ toast('ผิดพลาด: '+(e.message||e)); return; }
+    if(res && res.needOwner){
+      var code = window.prompt('รายการนี้เป็นของวันที่ปิดรอบ/วันก่อนหน้า — ใส่รหัสเจ้าของเพื่อยืนยัน');
+      if(!code) return;
+      try{ res = await call(code); }catch(e){ toast('ผิดพลาด: '+(e.message||e)); return; }
+    }
+    if(res && res.ok){ toast(res.msg||'สำเร็จ ✓'); loadRows(); }
+    else { toast((res&&res.error)||'ไม่สำเร็จ'); }
+  }
+  bodyEl.addEventListener('click', function(e){
+    var b = e.target.closest('.mlog-b'); if(!b) return;
+    if(b.classList.contains('edit')) act(b.dataset.id, 'edit', b.dataset.name, b.dataset.qty);
+    else act(b.dataset.id, 'delete', b.dataset.name);
+  });
+  dateEl.addEventListener('change', loadRows);
+  mount._reload = loadRows;
+  loadRows();
 }
 
 // ---- Service Worker ----
