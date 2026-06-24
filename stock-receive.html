@@ -75,6 +75,7 @@
 
       <div class="op-list" id="rcList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
+    <div id="moveEditor"></div>
   </div>
 
   <div class="op-bar" id="rcBar" style="display:none;">
@@ -197,6 +198,7 @@ document.getElementById('rcSaveBtn').addEventListener('click', function(){
   api('addStockReceive', { data:{ staff:staff, items:items, receipt:rc.receipt } })
     .then(function(res){
       toast(res.msg||'บันทึกแล้ว ✓');
+      var _me=document.getElementById('moveEditor'); if(_me&&_me._reload) _me._reload();
       rc.qty = {}; rc.receipt = null;
       document.getElementById('rcPreview').classList.remove('show');
       document.getElementById('rcClearReceipt').style.display = 'none';
@@ -213,6 +215,7 @@ document.getElementById('rcSaveBtn').addEventListener('click', function(){
 });
 
 renderIcons();
+mountMoveLog('receive', document.getElementById('moveEditor'));
 load();
 </script>
 </body>
