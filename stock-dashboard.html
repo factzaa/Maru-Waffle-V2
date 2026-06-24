@@ -18,11 +18,11 @@
 .ranges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
 .rg{border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:20px;
   font-family:'Kanit';font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap;}
-.rg.on{background:var(--ink);color:#FFC629;border-color:var(--ink);}
+.rg.on{background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#2E2400;border-color:#F2B100;}
 
-.datebar{background:#1A1A1A;color:#fff;border-radius:14px;padding:10px 14px;display:flex;
+.datebar{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 14px;display:flex;
   justify-content:space-between;align-items:center;margin-bottom:14px;font-family:'Kanit';font-weight:600;font-size:13px;}
-.datebar input[type=date]{background:transparent;border:0;color:#fff;font-family:'Kanit';font-size:13px;}
+.datebar input[type=date]{background:transparent;border:0;color:var(--ink);font-family:'Kanit';font-size:13px;}
 .datebar .sep{color:#9C8F7A;}
 
 /* KPI */
@@ -245,14 +245,17 @@ function render(){
 
   // === Forecast — ของที่น่าจะหมดเร็ว ===
   if (dashData.forecast.length > 0) {
-    html += '<div class="sec-card"><div class="h"><span class="em">⏰</span> ของที่น่าจะหมดเร็ว (ตามอัตราเบิกปัจจุบัน)</div>'
+    html += '<div class="sec-card"><div class="h"><span class="em">⏰</span> ของที่ต้องสั่งเพิ่ม (ใกล้หมด/หมดเร็ว)</div>'
       + dashData.forecast.map(function(f){
-        const cls = f.daysLeft <= 3 ? 'crit' : (f.daysLeft <= 7 ? 'warn' : 'ok');
-        const dLabel = f.daysLeft >= 100 ? '100+' : f.daysLeft;
+        const st = f.status || (f.daysLeft!=null && f.daysLeft<=3 ? 'critical' : (f.daysLeft!=null && f.daysLeft<=7 ? 'low' : 'ok'));
+        const cls = (st==='out'||st==='critical') ? 'crit' : (st==='low' ? 'warn' : 'ok');
+        const noRate = (f.daysLeft==null);
+        const dLabel = noRate ? '—' : (f.daysLeft >= 100 ? '100+' : f.daysLeft);
+        const dUnit  = noRate ? 'ต่ำกว่าจุดสั่ง' : 'วัน';
         return '<div class="fc-row '+cls+'">'
           +'<div class="info"><div class="nm">'+escHtml(f.name)+'</div>'
-            +'<div class="meta">เหลือ <b>'+f.balance+' '+escHtml(f.unit)+'</b> · เบิก '+f.avgDaily+'/วัน</div></div>'
-          +'<div class="days"><div class="d">'+dLabel+'</div><div class="l">วัน</div></div>'
+            +'<div class="meta">เหลือ <b>'+f.balance+' '+escHtml(f.unit)+'</b> · เบิก '+(noRate?'0':f.avgDaily)+'/วัน</div></div>'
+          +'<div class="days"><div class="d">'+dLabel+'</div><div class="l">'+dUnit+'</div></div>'
         +'</div>';
       }).join('')
     +'</div>';
