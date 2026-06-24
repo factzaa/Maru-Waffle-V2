@@ -70,6 +70,7 @@
 
       <div class="op-list" id="wdList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
+    <div id="moveEditor"></div>
   </div>
 
   <div class="op-bar" id="wdBar" style="display:none;">
@@ -170,6 +171,7 @@ document.getElementById('wdSaveBtn').addEventListener('click', function(){
   api('addStockWithdraw', { data:{ staff:staff, items:items } })
     .then(function(res){
       toast(res.msg||'บันทึกแล้ว ✓');
+      var _me=document.getElementById('moveEditor'); if(_me&&_me._reload) _me._reload();
       wd.qty = {};
       document.getElementById('wdSearch').value = '';
       wd.filter.q = '';
@@ -183,6 +185,7 @@ document.getElementById('wdSaveBtn').addEventListener('click', function(){
 });
 
 renderIcons();
+mountMoveLog('withdraw', document.getElementById('moveEditor'));
 load();
 </script>
 </body>
