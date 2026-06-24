@@ -39,6 +39,19 @@
 .irow .mv .seg.recv b{color:#15803D;} .irow .mv .seg.out b{color:#B91C1C;} .irow .mv .seg.waste b{color:#D97706;}
 .irow .mv .seg.bal{background:#ECFDF5;border-color:#A7F3D0;} .irow .mv .seg.bal b{color:#059669;}
 .empty{text-align:center;color:var(--ink-2);padding:30px 12px;font-size:14px;}
+.vbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:2px 0 12px;}
+.vtog{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;}
+.vtog .vb{border:0;background:#fff;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);}
+.vtog .vb.on{background:#1A1A1A;color:#FFC629;}
+.csvb{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);}
+.csvb:active{transform:scale(.97);}
+.tblwrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);}
+table.htbl{width:100%;border-collapse:collapse;font-family:'Sarabun';font-size:12.5px;}
+table.htbl th,table.htbl td{border:1px solid var(--line);padding:6px 9px;text-align:right;white-space:nowrap;}
+table.htbl th{background:#FFF7E0;color:#5A4A00;font-weight:700;}
+table.htbl td.l,table.htbl th.l{text-align:left;}
+table.htbl td.dt{font-weight:700;color:#1A1A1A;}
+table.htbl td.r{color:#15803D;}table.htbl td.o{color:#C2410C;}table.htbl td.w{color:#B45309;}
 </style>
 </head>
 <body>
@@ -63,6 +76,10 @@
       <button class="cc" data-cat="Drink">🥤 Drink</button>
       <button class="cc" data-cat="Other">📦 อื่นๆ</button>
     </div>
+    <div class="vbar">
+      <div class="vtog" id="vtog"><button class="vb on" data-v="card">การ์ด</button><button class="vb" data-v="table">ตาราง</button></div>
+      <button class="csvb" id="csvBtn">⬇️ CSV</button>
+    </div>
     <div id="histBody"><div class="empty">กำลังโหลด...</div></div>
     <div class="foot">🐤 แสดงเฉพาะวัน/รายการที่มีความเคลื่อนไหว (รับเข้า/เบิก/ของเสีย)</div>
   </div>
@@ -74,6 +91,7 @@ injectShell('stockHistory');
 registerSW();
 var $ = function(id){ return document.getElementById(id); };
 var st = { start:'', end:'', cat:'all' };
+var lastDays = [], viewMode = 'card';
 
 function fmtD(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function setRange(r){
@@ -86,11 +104,46 @@ function setRange(r){
 function esc(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function n(x){ var v=Math.round((Number(x)||0)*100)/100; return (v%1===0)? String(v) : v.toFixed(2); }
 
-function load(){
+var DOW = (typeof SB_DOW !== 'undefined') ? SB_DOW : ['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+function dm(s){ var p=String(s).split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
+async function fetchAllRows(path){
+  var all=[], from=0, page=1000;
+  for(var g=0; g<50; g++){
+    var res=await fetch(SB_URL+'/rest/v1/'+path,{ headers:{ apikey:SB_KEY, Authorization:'Bearer '+SB_KEY, 'Range-Unit':'items', Range: from+'-'+(from+page-1) } });
+    if(!res.ok) throw new Error('Supabase '+res.status);
+    var rows=await res.json(); if(!rows||!rows.length) break;
+    all=all.concat(rows); if(rows.length<page) break; from+=page;
+  }
+  return all;
+}
+async function load(){
   $('histBody').innerHTML = '<div class="empty">กำลังโหลด...</div>';
-  api('getStockMoveHistory', { start:st.start, end:st.end, category:st.cat })
-    .then(render)
-    .catch(function(e){ $('histBody').innerHTML = '<div class="empty">โหลดไม่ได้: '+esc(e.message)+'</div>'; });
+  try{
+    var CR={ Waffle:0, KUFF:1, Drink:2, Other:3, Others:3 };
+    var items=await fetchAllRows('stock_items?select=item_id,name,category,sort_order,unit');
+    var meta={}; items.forEach(function(r){ meta[r.item_id]={ name:r.name, category:r.category, order:Number(r.sort_order)||0, unit:r.unit }; });
+    var daily=await fetchAllRows('stock_daily?select=*&order=move_date.asc,created_at.asc');
+    var start=st.start, end=st.end, cat=st.cat;
+    var byDate={};
+    daily.forEach(function(r){
+      var m=meta[r.item_id]; if(!m) return;
+      var dt=r.move_date; if(!dt) return;
+      if(start && dt<start) return; if(end && dt>end) return;
+      if(cat!=='all' && m.category!==cat) return;
+      var recv=Number(r.receive_total)||0, used=Number(r.used)||0, waste=Number(r.waste)||0, wdt=Number(r.withdraw_total)||0;
+      if(!(recv>0||used>0||waste>0||wdt>0)) return;
+      (byDate[dt]=byDate[dt]||[]).push({ id:r.item_id, name:m.name, category:m.category, unit:m.unit, order:m.order,
+        open:Number(r.open_qty)||0, receive:recv, used:used, waste:waste, balance:Number(r.balance)||0 });
+    });
+    var dates=Object.keys(byDate).sort(function(a,b){ return String(b).localeCompare(String(a)); });
+    var days=dates.map(function(dt){
+      var its=byDate[dt].sort(function(a,b){ var ra=CR[a.category]!==undefined?CR[a.category]:9, rb=CR[b.category]!==undefined?CR[b.category]:9; if(ra!==rb)return ra-rb; if((a.order||0)!==(b.order||0))return a.order-b.order; return String(a.id).localeCompare(String(b.id),undefined,{numeric:true}); });
+      var tr=0, tu=0; its.forEach(function(x){ tr+=x.receive; tu+=x.used; });
+      var d=new Date(dt+'T00:00:00');
+      return { date:dt, dateDM:dm(dt), dow:DOW[d.getDay()], count:its.length, totalReceive:tr, totalUsed:tu, items:its };
+    });
+    lastDays = days; renderCurrent();
+  }catch(e){ $('histBody').innerHTML='<div class="empty">โหลดไม่ได้: '+esc(e.message||e)+'</div>'; }
 }
 function render(res){
   var days = (res && res.days) || [];
@@ -109,6 +162,45 @@ function render(res){
       + rows + '</div>';
   }).join('');
 }
+function renderCurrent(){ if(viewMode==='table') renderTable(lastDays); else render({ days:lastDays }); }
+function renderTable(days){
+  if(!days.length){ $('histBody').innerHTML = '<div class="empty">ไม่มีความเคลื่อนไหวในช่วงนี้</div>'; return; }
+  var head='<tr><th class="l">วันที่</th><th class="l">หมวด</th><th class="l">สินค้า</th><th>เริ่มต้น</th><th>รับเข้า</th><th>เบิก/ใช้</th><th>ของเสีย</th><th>คงเหลือ</th><th class="l">หน่วย</th></tr>';
+  var body='';
+  days.forEach(function(d){
+    d.items.forEach(function(it,i){
+      body += '<tr>'
+        + '<td class="l dt">'+(i===0?esc(d.dateDM)+' ('+esc(d.dow)+')':'')+'</td>'
+        + '<td class="l">'+esc(it.category)+'</td>'
+        + '<td class="l">'+esc(it.name)+'</td>'
+        + '<td>'+n(it.open)+'</td>'
+        + '<td class="r">'+(it.receive>0?'+'+n(it.receive):'')+'</td>'
+        + '<td class="o">'+(it.used>0?'-'+n(it.used):'')+'</td>'
+        + '<td class="w">'+(it.waste>0?'-'+n(it.waste):'')+'</td>'
+        + '<td><b>'+n(it.balance)+'</b></td>'
+        + '<td class="l">'+esc(it.unit||'')+'</td>'
+      +'</tr>';
+    });
+  });
+  $('histBody').innerHTML = '<div class="tblwrap"><table class="htbl">'+head+body+'</table></div>';
+}
+function dlCSV(days){
+  if(!days.length){ alert('ไม่มีข้อมูลให้บันทึก'); return; }
+  function q(v){ v=String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  var head=['วันที่','วัน','หมวด','สินค้า','หน่วย','เริ่มต้น','รับเข้า','เบิก/ใช้','ของเสีย','คงเหลือสิ้นวัน'];
+  var lines=[head.map(q).join(',')];
+  days.forEach(function(d){
+    d.items.forEach(function(it){
+      lines.push([d.date, d.dow, it.category, it.name, it.unit||'', n(it.open), n(it.receive), n(it.used), n(it.waste), n(it.balance)].map(q).join(','));
+    });
+  });
+  var blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='ประวัติเคลื่อนไหวสต๊อก_'+(st.start||'')+'_ถึง_'+(st.end||'')+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+$('vtog').addEventListener('click', function(e){ var b=e.target.closest('.vb'); if(!b) return; document.querySelectorAll('#vtog .vb').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); viewMode=b.dataset.v; renderCurrent(); });
+$('csvBtn').addEventListener('click', function(){ dlCSV(lastDays); });
 
 setRange('month'); load();
 $('presets').addEventListener('click', function(e){
