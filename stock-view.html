@@ -40,6 +40,18 @@
 .stock-row .bal .u{font-size:11px;color:var(--ink-2);}
 .stock-row.low .bal .n{color:#F37316;}
 .stock-row.out .bal .n{color:var(--red);}
+.vbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 12px;}
+.vtog{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;}
+.vtog .vb{border:0;background:#fff;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);}
+.vtog .vb.on{background:#1A1A1A;color:#FFC629;}
+.csvb{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);}
+.csvb:active{transform:scale(.97);}
+.tblwrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);}
+table.htbl{width:100%;border-collapse:collapse;font-family:'Sarabun';font-size:12.5px;}
+table.htbl th,table.htbl td{border:1px solid var(--line);padding:6px 9px;text-align:right;white-space:nowrap;}
+table.htbl th{background:#FFF7E0;color:#5A4A00;font-weight:700;}
+table.htbl td.l,table.htbl th.l{text-align:left;}
+table.htbl td.o{color:#B91C1C;font-weight:700;}table.htbl td.w{color:#92400E;font-weight:700;}
 </style>
 </head>
 <body>
@@ -69,6 +81,10 @@
         <button class="stock-cat-chip" data-cat="out" style="background:#FEE2E2;border-color:#FCA5A5;color:#B91C1C;">🚫 ของหมด</button>
       </div>
 
+      <div class="vbar">
+        <div class="vtog" id="stockVtog"><button class="vb on" data-v="card">การ์ด</button><button class="vb" data-v="table">ตาราง</button></div>
+        <button class="csvb" id="stockCsvBtn">⬇️ CSV</button>
+      </div>
       <div class="stock-list" id="stockList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
     <div class="foot">🐤 ข้อมูลอัปเดตทันทีหลังจากเบิก/รับเข้า/ปิดร้าน</div>
@@ -81,6 +97,7 @@ injectShell('stockView');
 registerSW();
 
 let stockData = { items: [], summary: {}, filter: { cat: 'all', q: '' } };
+let viewMode = 'card';
 
 function loadStockView(){
   document.getElementById('stockList').innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div>';
@@ -101,30 +118,68 @@ function renderStockSummary(){
     +'<div class="sk warn"><div class="v">'+(s.lowStock||0)+'</div><div class="l">⚠️ ใกล้หมด</div></div>'
     +'<div class="sk bad"><div class="v">'+(s.outOfStock||0)+'</div><div class="l">🚫 หมดสต๊อก</div></div>';
 }
-function renderStockList(){
+function getStockFiltered(){
   const q = (stockData.filter.q || '').toLowerCase();
   const cat = stockData.filter.cat;
   const CAT_ORDER = { Waffle:0, KUFF:1, Drink:2, Other:3 };
   const filtered = stockData.items.filter(function(it){
     if(!it.active) return false;
-    if(cat === 'low')      { if(!(it.lowStock && it.balance > 0)) return false; }   // ใกล้หมด (ยังไม่หมด)
-    else if(cat === 'out') { if(it.balance > 0) return false; }                     // หมดสต๊อก
+    if(cat === 'low')      { if(!(it.lowStock && it.balance > 0)) return false; }
+    else if(cat === 'out') { if(it.balance > 0) return false; }
     else if(cat !== 'all') { if(it.category !== cat) return false; }
     if(q && it.name.toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
-  // เรียงตามหมวด (ตามลำดับ chip) แล้วตามรหัสสินค้า
   filtered.sort(function(a,b){
     const ra = (CAT_ORDER[a.category] !== undefined ? CAT_ORDER[a.category] : 9);
     const rb = (CAT_ORDER[b.category] !== undefined ? CAT_ORDER[b.category] : 9);
     if(ra !== rb) return ra - rb;
     return String(a.id||'').localeCompare(String(b.id||''), undefined, { numeric:true });
   });
+  return filtered;
+}
+function stockTableHtml(items){
+  var head='<tr><th class="l">รหัส</th><th class="l">สินค้า</th><th class="l">หมวด</th><th>คงเหลือ</th><th class="l">หน่วย</th><th>ขั้นต่ำ</th><th>วันนี้ รับ/เบิก</th><th class="l">สถานะ</th></tr>';
+  var body=items.map(function(it){
+    var stt = it.balance<=0?'หมด':(it.lowStock?'ใกล้หมด':'ปกติ');
+    var stc = it.balance<=0?'o':(it.lowStock?'w':'');
+    var td = (it.todayReceive>0?'+'+it.todayReceive:'')+((it.todayReceive>0&&it.todayWithdraw>0)?' / ':'')+(it.todayWithdraw>0?'-'+it.todayWithdraw:'');
+    return '<tr>'
+      +'<td class="l">'+escHtml(it.id||'')+'</td>'
+      +'<td class="l">'+escHtml(it.name)+'</td>'
+      +'<td class="l">'+escHtml(it.category||'')+'</td>'
+      +'<td><b>'+it.balance+'</b></td>'
+      +'<td class="l">'+escHtml(it.unit||'')+'</td>'
+      +'<td>'+(it.minStock>0?it.minStock:'')+'</td>'
+      +'<td>'+escHtml(td)+'</td>'
+      +'<td class="l '+stc+'">'+stt+'</td>'
+    +'</tr>';
+  }).join('');
+  return '<div class="tblwrap"><table class="htbl">'+head+body+'</table></div>';
+}
+function dlStockCSV(){
+  var items=getStockFiltered();
+  if(!items.length){ alert('ไม่มีข้อมูลให้บันทึก'); return; }
+  function q(v){ v=String(v==null?'':v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; }
+  var head=['รหัส','สินค้า','หมวด','หน่วย','คงเหลือ','ขั้นต่ำ','วันนี้รับเข้า','วันนี้เบิก','สถานะ'];
+  var lines=[head.map(q).join(',')];
+  items.forEach(function(it){
+    var stt=it.balance<=0?'หมด':(it.lowStock?'ใกล้หมด':'ปกติ');
+    lines.push([it.id||'', it.name, it.category||'', it.unit||'', it.balance, it.minStock||0, it.todayReceive||0, it.todayWithdraw||0, stt].map(q).join(','));
+  });
+  var blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  var d=new Date(); var ds=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ตรวจสต๊อก_'+ds+'.csv';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+function renderStockList(){
+  const filtered = getStockFiltered();
   const box = document.getElementById('stockList');
   if(!filtered.length){
     box.innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">ไม่พบรายการ</div>';
     return;
   }
+  if(viewMode === 'table'){ box.innerHTML = stockTableHtml(filtered); return; }
   box.innerHTML = filtered.map(function(it){
     const cls = it.balance <= 0 ? 'out' : (it.lowStock ? 'low' : '');
     const modePill = it.mode === 'count' ? '<span class="pill mode-count">โหมด: ชั่งกรัม</span>' : '<span class="pill">โหมด: นับชิ้น</span>';
@@ -156,6 +211,8 @@ document.querySelectorAll('#stockCatChips .stock-cat-chip').forEach(function(b){
   });
 });
 
+document.getElementById('stockVtog').addEventListener('click', function(e){ var b=e.target.closest('.vb'); if(!b) return; document.querySelectorAll('#stockVtog .vb').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); viewMode=b.dataset.v; renderStockList(); });
+document.getElementById('stockCsvBtn').addEventListener('click', dlStockCSV);
 renderIcons();
 loadStockView();
 </script>
