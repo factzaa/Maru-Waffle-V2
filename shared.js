@@ -1013,6 +1013,39 @@ async function sbGetStockMoveHistory(p){
   return { ok:true, days:days, range:{ start:start, end:end } };
 }
 
+async function sbGetDashboardData(p){
+  const start = p.start, end = p.end;
+  const sD = new Date(start + 'T00:00:00'), eD = new Date(end + 'T00:00:00');
+  const days = Math.round((eD - sD) / 86400000) + 1;
+  const prevEnd = new Date(sD.getTime() - 86400000), prevStart = new Date(prevEnd.getTime() - (days - 1) * 86400000);
+  const prevStartStr = sbFmtD(prevStart), prevEndStr = sbFmtD(prevEnd);
+  const [salesRows, expRows] = await Promise.all([
+    sbFetch('sales?select=sale_date,total,cash,transfer,thaihelp,lineman,grab,shopee,robinhood,cash_diff&order=sale_date.asc'),
+    sbFetch('expenses?select=exp_date,item,amount')
+  ]);
+  const chanTotal = {}; SB_CH.forEach(function (c) { chanTotal[c.key] = 0; });
+  const byDay = {}, byDow = [0,0,0,0,0,0,0], byDowCnt = [0,0,0,0,0,0,0];
+  let totalSales = 0, cash = 0, transfer = 0, thaihelp = 0, delivery = 0, dayCount = 0, prevTotal = 0, cashDiff = 0;
+  salesRows.forEach(function (r) {
+    const dd = r.sale_date, dayTotal = Number(r.total) || 0;
+    if (dd >= start && dd <= end) {
+      totalSales += dayTotal; dayCount++; byDay[dd] = dayTotal;
+      var di = new Date(dd + 'T00:00:00').getDay(); byDow[di] += dayTotal; byDowCnt[di]++;
+      cashDiff += Number(r.cash_diff) || 0;
+      SB_CH.forEach(function (c) { const v = Number(r[c.key]) || 0; chanTotal[c.key] += v; if (c.group === 'store') { if (c.key === 'cash') cash += v; else if (c.key === 'transfer') transfer += v; else if (c.key === 'thaihelp') thaihelp += v; } else delivery += v; });
+    } else if (dd >= prevStartStr && dd <= prevEndStr) prevTotal += dayTotal;
+  });
+  let totalExpenses = 0; const expByCat = {};
+  expRows.forEach(function (r) { const dd = r.exp_date; if (dd >= start && dd <= end) { const a = Number(r.amount) || 0; totalExpenses += a; const c = r.item || 'อื่นๆ'; expByCat[c] = (expByCat[c] || 0) + a; } });
+  const byDayArr = Object.keys(byDay).sort().map(function (k) { return { date: k, total: byDay[k] }; });
+  const byChannelArr = SB_CH.map(function (c) { return { label: c.label, total: chanTotal[c.key] }; }).filter(function (o) { return o.total > 0; }).sort(function (a, b) { return b.total - a.total; });
+  const expByCatArr = Object.keys(expByCat).map(function (k) { return { category: k, total: expByCat[k] }; }).sort(function (a, b) { return b.total - a.total; });
+  let bestDay = null; byDayArr.forEach(function (o) { if (!bestDay || o.total > bestDay.total) bestDay = o; });
+  function dowAvg(i) { return byDowCnt[i] > 0 ? byDow[i] / byDowCnt[i] : 0; }
+  let bestDowIdx = 0; for (let i = 1; i < 7; i++) { if (dowAvg(i) > dowAvg(bestDowIdx)) bestDowIdx = i; }
+  return { range: { start: start, end: end }, summary: { totalSales: totalSales, cash: cash, transfer: transfer, thaihelp: thaihelp, delivery: delivery, totalExpenses: totalExpenses, netProfit: totalSales - totalExpenses, dayCount: dayCount, avgPerDay: dayCount ? totalSales / dayCount : 0, prevTotal: prevTotal, growth: prevTotal > 0 ? ((totalSales - prevTotal) / prevTotal * 100) : null, bestDay: bestDay, bestDow: byDayArr.length ? SB_DOW[bestDowIdx] : null, bestDowAvg: byDayArr.length ? Math.round(dowAvg(bestDowIdx)) : 0, cashDiff: cashDiff }, byChannel: byChannelArr, byDay: byDayArr, byDow: byDow, byDowCount: byDowCnt, dowNames: SB_DOW, expByCat: expByCatArr };
+}
+
 const SB_ACTIONS = {
   getHomeDashboard: sbGetHomeDashboard,
   getDashboardData: sbGetDashboardData,
