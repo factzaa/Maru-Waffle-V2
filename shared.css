@@ -128,3 +128,8 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFFBF0;color:var(--in
 .mlog-b.del{color:#B91C1C;border-color:#FCA5A5;background:#FEF2F2;}
 .mlog-auto{font-size:11.5px;color:#A8997C;font-style:italic;padding-right:4px;}
 .mlog-empty{text-align:center;color:#9A8C6E;padding:18px;font-size:12.5px;}
+
+.mlog-jump{width:100%;margin:2px 0 12px;border:1.5px solid #F2D58A;background:#FFF7E0;color:#92400E;border-radius:12px;padding:11px;font-family:'Kanit';font-weight:700;font-size:13.5px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;}
+.mlog-jump:active{transform:scale(.99);}
+@keyframes mlogFlash{0%{box-shadow:0 0 0 0 rgba(245,176,0,.0);}30%{box-shadow:0 0 0 3px rgba(245,176,0,.45);}100%{box-shadow:0 0 0 0 rgba(245,176,0,0);}}
+.mlog-flash .mlog{animation:mlogFlash 1.2s ease;}
