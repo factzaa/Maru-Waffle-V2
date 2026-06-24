@@ -113,3 +113,18 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFFBF0;color:var(--in
 .biz-prev.show{display:block;}
 
 .foot{text-align:center;font-size:11.5px;color:#7A6940;margin-top:18px;}
+
+.mlog{margin-top:10px;border:1px solid #F0E8D6;border-radius:14px;background:#fff;overflow:hidden;}
+.mlog-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:11px 14px;background:#FBF5E6;font-family:'Kanit';font-weight:700;font-size:13.5px;color:#5A4A00;}
+.mlog-h .mlog-date{border:1.5px solid var(--line,#E9E2D0);border-radius:9px;padding:5px 8px;font-family:'Sarabun';font-size:12.5px;background:#fff;color:#1A1A1A;}
+.mlog-body{max-height:300px;overflow-y:auto;}
+.mlog-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid #F3EBD6;}
+.mlog-row:first-child{border-top:0;}
+.mlog-nm{font-family:'Kanit';font-weight:600;font-size:13.5px;color:#1A1A1A;}
+.mlog-meta{font-size:11.5px;color:#9A8C6E;margin-top:1px;}
+.mlog-act{display:flex;gap:6px;flex:none;}
+.mlog-b{border:1.5px solid var(--line,#E9E2D0);background:#fff;border-radius:9px;padding:6px 12px;font-family:'Kanit';font-weight:700;font-size:12.5px;cursor:pointer;}
+.mlog-b.edit{color:#15803D;border-color:#A7F3D0;background:#ECFDF5;}
+.mlog-b.del{color:#B91C1C;border-color:#FCA5A5;background:#FEF2F2;}
+.mlog-auto{font-size:11.5px;color:#A8997C;font-style:italic;padding-right:4px;}
+.mlog-empty{text-align:center;color:#9A8C6E;padding:18px;font-size:12.5px;}
