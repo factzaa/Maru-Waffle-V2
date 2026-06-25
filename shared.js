@@ -1321,13 +1321,24 @@ function maruPrintSlip(opts){
     + '<div class="foot">พิมพ์จากแอป Maru Waffle</div>'
     + '<div style="height:8mm;"></div>'
     + '</body></html>';
-  var ifr = document.createElement('iframe');
-  ifr.setAttribute('aria-hidden','true');
-  ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;';
-  document.body.appendChild(ifr);
+  // แสดงตัวอย่างสลิปบนจอ (กว้าง 58mm จริง) — ดูได้แม้ไม่มีเครื่องพิมพ์ แล้วค่อยกดพิมพ์
+  var ov = document.createElement('div');
+  ov.className = 'slip-ov';
+  ov.innerHTML = '<div class="slip-card">'
+    + '<div class="slip-ttl">ตัวอย่างสลิป · 58mm</div>'
+    + '<div class="slip-wrap"><iframe class="slip-frame" title="ตัวอย่างสลิป"></iframe></div>'
+    + '<div class="slip-btns"><button type="button" class="slip-print">🖨️ พิมพ์</button><button type="button" class="slip-close">ปิด</button></div>'
+    + '</div>';
+  document.body.appendChild(ov);
+  var ifr = ov.querySelector('.slip-frame');
   var w = ifr.contentWindow;
   w.document.open(); w.document.write(doc); w.document.close();
-  setTimeout(function(){ try{ w.focus(); w.print(); }catch(err){} setTimeout(function(){ try{ document.body.removeChild(ifr); }catch(err){} }, 3000); }, 450);
+  function fit(){ try{ ifr.style.height = (w.document.body.scrollHeight + 6) + 'px'; }catch(err){} }
+  setTimeout(fit, 250); setTimeout(fit, 600);
+  function close(){ try{ document.body.removeChild(ov); }catch(err){} }
+  ov.querySelector('.slip-print').addEventListener('click', function(){ try{ w.focus(); w.print(); }catch(err){} });
+  ov.querySelector('.slip-close').addEventListener('click', close);
+  ov.addEventListener('click', function(ev){ if(ev.target===ov) close(); });
 }
 
 // ---- Service Worker ----
