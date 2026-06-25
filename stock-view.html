@@ -40,12 +40,6 @@
 .stock-row .bal .u{font-size:11px;color:var(--ink-2);}
 .stock-row.low .bal .n{color:#F37316;}
 .stock-row.out .bal .n{color:var(--red);}
-.vbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:8px 0 12px;}
-.vtog{display:inline-flex;border:1.5px solid var(--line);border-radius:10px;overflow:hidden;}
-.vtog .vb{border:0;background:#fff;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);}
-.vtog .vb.on{background:#1A1A1A;color:#FFC629;}
-.csvb{border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:'Kanit';cursor:pointer;color:var(--ink);}
-.csvb:active{transform:scale(.97);}
 .tblwrap{overflow-x:auto;border-radius:12px;border:1px solid var(--line);}
 table.htbl{width:100%;border-collapse:collapse;font-family:'Sarabun';font-size:12.5px;}
 table.htbl th,table.htbl td{border:1px solid var(--line);padding:6px 9px;text-align:right;white-space:nowrap;}
@@ -83,7 +77,7 @@ table.htbl td.o{color:#B91C1C;font-weight:700;}table.htbl td.w{color:#92400E;fon
 
       <div class="vbar">
         <div class="vtog" id="stockVtog"><button class="vb on" data-v="card">การ์ด</button><button class="vb" data-v="table">ตาราง</button></div>
-        <div style="display:flex;gap:6px;"><button class="csvb" id="stockPrintBtn">🖨️ พิมพ์</button><button class="csvb" id="stockCsvBtn">⬇️ CSV</button></div>
+        <div style="display:flex;gap:6px;"><button class="csvb print" id="stockPrintBtn">🖨️ พิมพ์</button><button class="csvb" id="stockCsvBtn">⬇️ CSV</button></div>
       </div>
       <div class="stock-list" id="stockList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
