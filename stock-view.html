@@ -83,7 +83,7 @@ table.htbl td.o{color:#B91C1C;font-weight:700;}table.htbl td.w{color:#92400E;fon
 
       <div class="vbar">
         <div class="vtog" id="stockVtog"><button class="vb on" data-v="card">การ์ด</button><button class="vb" data-v="table">ตาราง</button></div>
-        <button class="csvb" id="stockCsvBtn">⬇️ CSV</button>
+        <div style="display:flex;gap:6px;"><button class="csvb" id="stockPrintBtn">🖨️ พิมพ์</button><button class="csvb" id="stockCsvBtn">⬇️ CSV</button></div>
       </div>
       <div class="stock-list" id="stockList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
@@ -212,6 +212,19 @@ document.querySelectorAll('#stockCatChips .stock-cat-chip').forEach(function(b){
 });
 
 document.getElementById('stockVtog').addEventListener('click', function(e){ var b=e.target.closest('.vb'); if(!b) return; document.querySelectorAll('#stockVtog .vb').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); viewMode=b.dataset.v; renderStockList(); });
+function printStock(){
+  var items=getStockFiltered();
+  if(!items.length){ toast('ไม่มีข้อมูลให้พิมพ์'); return; }
+  var L={all:'ทั้งหมด',Waffle:'Waffle',KUFF:'KUFF',Drink:'Drink',Other:'อื่นๆ',low:'ใกล้หมด',out:'หมด'};
+  var cat=L[stockData.filter.cat]||stockData.filter.cat;
+  var low=0,out=0;
+  var rows=items.map(function(it){
+    var st=''; if(it.balance<=0){ st='(หมด)'; out++; } else if(it.lowStock){ st='(ใกล้หมด)'; low++; }
+    return { l: it.name, r: (it.balance+' '+(it.unit||'')), tag: st };
+  });
+  maruPrintSlip({ title:'ตรวจสต๊อก', meta:['หมวด: '+cat+(stockData.filter.q?(' · ค้นหา: '+stockData.filter.q):'')], rows:rows, summary:'รวม '+items.length+' รายการ · ใกล้หมด '+low+' · หมด '+out });
+}
+document.getElementById('stockPrintBtn').addEventListener('click', printStock);
 document.getElementById('stockCsvBtn').addEventListener('click', dlStockCSV);
 renderIcons();
 loadStockView();
