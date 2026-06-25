@@ -216,11 +216,15 @@ function printStock(){
   var items=getStockFiltered();
   if(!items.length){ toast('ไม่มีข้อมูลให้พิมพ์'); return; }
   var L={all:'ทั้งหมด',Waffle:'Waffle',KUFF:'KUFF',Drink:'Drink',Other:'อื่นๆ',low:'ใกล้หมด',out:'หมด'};
+  var CL={Waffle:'Waffle',KUFF:'KUFF',Drink:'Drink',Other:'อื่นๆ',Others:'อื่นๆ'};
   var cat=L[stockData.filter.cat]||stockData.filter.cat;
-  var low=0,out=0;
-  var rows=items.map(function(it){
+  var counts={}; items.forEach(function(it){ counts[it.category]=(counts[it.category]||0)+1; });
+  var low=0,out=0,rows=[],curCat=null;
+  items.forEach(function(it){
+    var c=it.category||'';
+    if(c!==curCat){ curCat=c; rows.push({ head: (CL[c]||c||'อื่นๆ')+' ('+(counts[c]||0)+')' }); }
     var st=''; if(it.balance<=0){ st='(หมด)'; out++; } else if(it.lowStock){ st='(ใกล้หมด)'; low++; }
-    return { l: it.name, r: (it.balance+' '+(it.unit||'')), tag: st };
+    rows.push({ l: it.name, r: (it.balance+' '+(it.unit||'')), tag: st });
   });
   maruPrintSlip({ title:'ตรวจสต๊อก', meta:['หมวด: '+cat+(stockData.filter.q?(' · ค้นหา: '+stockData.filter.q):'')], rows:rows, summary:'รวม '+items.length+' รายการ · ใกล้หมด '+low+' · หมด '+out });
 }
