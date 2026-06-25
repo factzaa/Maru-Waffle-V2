@@ -1218,17 +1218,19 @@ async function mountMoveLog(kind, mount){
   var title = kind==='receive' ? 'รายการรับเข้าล่าสุด' : 'รายการเบิกล่าสุด';
   var today = sbLocalDate();
   mount.innerHTML = '<div class="mlog">'
-    + '<div class="mlog-h"><span>🧾 '+title+'</span><input type="date" class="mlog-date" value="'+today+'"></div>'
+    + '<div class="mlog-h"><span>🧾 '+title+'</span><div class="mlog-tools"><input type="date" class="mlog-date" value="'+today+'"><button type="button" class="mlog-print" title="พิมพ์สลิป">🖨️</button></div></div>'
     + '<div class="mlog-body"><div class="mlog-empty">กำลังโหลด...</div></div>'
     + '</div>';
   var dateEl = mount.querySelector('.mlog-date');
   var bodyEl = mount.querySelector('.mlog-body');
+  var lastRows = [];
   async function loadRows(){
     var d = dateEl.value || today;
     bodyEl.innerHTML = '<div class="mlog-empty">กำลังโหลด...</div>';
     try{
-      var sel = kind==='receive' ? 'id,item_name,qty,note,created_at' : 'id,item_name,qty,move_time,note,created_at';
+      var sel = kind==='receive' ? 'id,item_name,qty,recorded_by,note,created_at' : 'id,item_name,qty,move_time,recorded_by,note,created_at';
       var rows = await sbFetch(table+'?select='+sel+'&move_date=eq.'+encodeURIComponent(d)+'&order=created_at.desc');
+      lastRows = rows || [];
       if(!rows.length){ bodyEl.innerHTML = '<div class="mlog-empty">ไม่มีรายการในวันนี้</div>'; return; }
       bodyEl.innerHTML = rows.map(function(r){
         var isAuto = String(r.note||'').indexOf('เบิกอัตโนมัติจากการนับปิดรอบ')===0;
@@ -1267,6 +1269,19 @@ async function mountMoveLog(kind, mount){
     var b = e.target.closest('.mlog-b'); if(!b) return;
     if(b.classList.contains('edit')) act(b.dataset.id, 'edit', b.dataset.name, b.dataset.qty);
     else act(b.dataset.id, 'delete', b.dataset.name);
+  });
+  var printBtn = mount.querySelector('.mlog-print');
+  if(printBtn) printBtn.addEventListener('click', function(){
+    if(!lastRows.length){ toast('ไม่มีรายการให้พิมพ์'); return; }
+    var d = dateEl.value || today; var dp = String(d).split('-'); var ds = dp[2]+'/'+dp[1]+'/'+dp[0];
+    var tot = 0;
+    var prows = lastRows.map(function(r){
+      tot += Number(r.qty)||0;
+      var tm = (kind==='withdraw' && r.move_time) ? String(r.move_time).slice(0,5) : '';
+      var sub = (tm?('เวลา '+tm):'') + (r.recorded_by?((tm?' · ':'')+'โดย '+r.recorded_by):'');
+      return { l: r.item_name, r: String(r.qty), sub: sub };
+    });
+    maruPrintSlip({ title:(kind==='receive'?'สลิปรับเข้า':'สลิปเบิกออก'), meta:['วันที่ '+ds], rows:prows, summary:'รวม '+lastRows.length+' รายการ · จำนวนรวม '+(Math.round(tot*100)/100) });
   });
   dateEl.addEventListener('change', loadRows);
   mount._reload = loadRows;
