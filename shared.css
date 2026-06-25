@@ -154,3 +154,7 @@ body{margin:0;font-family:'Sarabun',sans-serif;background:#FFFBF0;color:var(--in
 .csvb:active{transform:translateY(1px);}
 .csvb.print{background:linear-gradient(180deg,#FFD84D,#FBC02D);border-color:#EFAE00;color:#3A2E00;box-shadow:0 2px 7px rgba(245,176,0,.32);}
 .csvb.print:hover{filter:brightness(1.04);}
+
+.mlog-tools{display:flex;gap:8px;align-items:center;}
+.mlog-print{border:1.5px solid #EFAE00;background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#3A2E00;border-radius:9px;padding:5px 11px;font-size:14px;cursor:pointer;line-height:1;}
+.mlog-print:active{transform:translateY(1px);}
