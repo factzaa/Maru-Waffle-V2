@@ -1273,6 +1273,63 @@ async function mountMoveLog(kind, mount){
   loadRows();
 }
 
+// ---- เครื่องพิมพ์กลาง: สลิป 58mm ผ่าน RawBT (เรนเดอร์เป็นภาพ ภาษาไทยครบ) ----
+function maruPrintSlip(opts){
+  opts = opts || {};
+  var now = new Date();
+  var dt = (typeof sbLocalDate==='function') ? sbLocalDate() : now.toISOString().slice(0,10);
+  var p = String(dt).split('-'); var dstr = p[2]+'/'+p[1]+'/'+p[0];
+  var tstr = now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+  function e(x){ return String(x==null?'':x).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  var metaHtml = (opts.meta||[]).map(function(m){ return '<div class="meta center">'+e(m)+'</div>'; }).join('');
+  var rowsHtml = (opts.rows||[]).map(function(r){
+    if(r.head) return '<div class="rhead">'+e(r.head)+'</div>';
+    var tag = r.tag ? ' '+e(r.tag) : '';
+    var sub = r.sub ? '<div class="sub">'+e(r.sub)+'</div>' : '';
+    return '<div class="row"><span class="l">'+e(r.l)+'</span><span class="r">'+e(r.r||'')+tag+'</span></div>'+sub;
+  }).join('');
+  var doc = '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+    + '<style>'
+    + '@page{size:58mm auto;margin:0;}'
+    + '*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + 'html,body{margin:0;padding:0;}'
+    + 'body{width:58mm;padding:3mm 2.5mm;font-family:"Sarabun","Noto Sans Thai",sans-serif;color:#000;font-size:12px;line-height:1.35;}'
+    + '.center{text-align:center;}'
+    + '.shop{font-weight:800;font-size:16px;}'
+    + '.branch{font-size:11px;margin-bottom:1px;}'
+    + '.title{font-weight:800;font-size:14px;margin-top:5px;}'
+    + '.meta{font-size:11px;}'
+    + '.hr{border-top:1px dashed #000;margin:5px 0;}'
+    + '.row{display:flex;justify-content:space-between;gap:6px;font-size:12px;padding:1.5px 0;}'
+    + '.row .l{flex:1;word-break:break-word;}'
+    + '.row .r{flex:none;text-align:right;white-space:nowrap;font-weight:700;}'
+    + '.rhead{font-weight:800;font-size:11.5px;margin-top:5px;border-bottom:1px solid #000;padding-bottom:1px;}'
+    + '.sub{font-size:10.5px;padding-left:3px;}'
+    + '.sum{font-weight:700;font-size:12px;margin-top:3px;}'
+    + '.foot{text-align:center;font-size:10.5px;margin-top:7px;}'
+    + '</style></head><body>'
+    + '<div class="center shop">Maru Waffle</div>'
+    + '<div class="center branch">สาขา ปทุมวัน · งามวงศ์วาน</div>'
+    + '<div class="center title">'+e(opts.title||'')+'</div>'
+    + '<div class="center meta">'+dstr+'  '+tstr+'</div>'
+    + metaHtml
+    + '<div class="hr"></div>'
+    + rowsHtml
+    + '<div class="hr"></div>'
+    + (opts.summary ? '<div class="sum">'+e(opts.summary)+'</div>' : '')
+    + (opts.note ? '<div class="meta">'+e(opts.note)+'</div>' : '')
+    + '<div class="foot">พิมพ์จากแอป Maru Waffle</div>'
+    + '<div style="height:8mm;"></div>'
+    + '</body></html>';
+  var ifr = document.createElement('iframe');
+  ifr.setAttribute('aria-hidden','true');
+  ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;';
+  document.body.appendChild(ifr);
+  var w = ifr.contentWindow;
+  w.document.open(); w.document.write(doc); w.document.close();
+  setTimeout(function(){ try{ w.focus(); w.print(); }catch(err){} setTimeout(function(){ try{ document.body.removeChild(ifr); }catch(err){} }, 3000); }, 450);
+}
+
 // ---- Service Worker ----
 function registerSW(){
   if('serviceWorker' in navigator){
