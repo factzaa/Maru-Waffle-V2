@@ -103,6 +103,7 @@
         <input type="search" id="clSearch" placeholder="ค้นหารายการ...">
       </div>
 
+      <div style="margin:8px 0 4px;"><button class="csvb print" id="clPrintBtn" style="width:100%;">🖨️ พิมพ์สรุปปิดร้าน</button></div>
       <div id="clList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
 
       <textarea id="clNote" placeholder="หมายเหตุประจำวัน (ไม่บังคับ)" style="width:100%;margin-top:12px;border:1.5px solid var(--line);border-radius:11px;padding:10px;font-size:14px;font-family:'Sarabun';min-height:60px;resize:vertical;"></textarea>
@@ -177,6 +178,25 @@ function updateRow(id){
     + (isAuto ? ' <span class="auto-tag">(อัตโนมัติ)</span>' : '');
 }
 
+var CL_PR={Waffle:'Waffle',KUFF:'KUFF',Drink:'Drink',Other:'อื่นๆ',Others:'อื่นๆ'};
+function printCloseSummary(){
+  var items = cl.balances.filter(function(it){ return it.active!==false; });
+  if(!items.length){ toast('ไม่มีรายการให้พิมพ์'); return; }
+  var counts={}; items.forEach(function(it){ counts[it.category]=(counts[it.category]||0)+1; });
+  var rows=[],cur=null;
+  items.forEach(function(it){
+    var c=it.category||''; if(c!==cur){ cur=c; rows.push({ head:(CL_PR[c]||c||'อื่นๆ')+' ('+(counts[c]||0)+')' }); }
+    var open=Number(it.closeBalance)||0, recv=Number(it.sinceReceive)||0, used=Number(it.sinceWithdraw)||0;
+    var waste=parseFloat(cl.wastes[it.id])||0;
+    var autoClosing=Math.round((open+recv-used-waste)*100)/100;
+    var touched=(cl.closings[it.id]!==undefined && cl.closings[it.id]!=='');
+    var closeBal = touched ? (parseFloat(cl.closings[it.id])||0) : autoClosing;
+    var actUse = Math.round((open+recv-closeBal-waste)*100)/100;
+    rows.push({ l: it.name, r: 'เหลือ '+closeBal, sub: 'เปิด '+open+' · รับ '+recv+' · ใช้ '+actUse+(waste>0?(' · เสีย '+waste):'')+' '+(it.unit||'') });
+  });
+  var staff=document.getElementById('clStaff').value.trim();
+  maruPrintSlip({ title:'สรุปปิดร้าน (สต๊อก)', meta:['ผู้ปิดรอบ: '+(staff||'-')], rows:rows, summary:'รวม '+items.length+' รายการ' });
+}
 function render(){
   const q = (cl.filter.q||'').toLowerCase();
   const cat = cl.filter.cat;
@@ -311,6 +331,7 @@ document.getElementById('wdCancel').addEventListener('click', function(){ docume
 document.getElementById('wdOk').addEventListener('click', function(){ document.getElementById('wdModal').classList.remove('show'); doClose(); });
 document.getElementById('wdModal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('show'); });
 
+document.getElementById('clPrintBtn').addEventListener('click', printCloseSummary);
 renderIcons();
 load();
 </script>
