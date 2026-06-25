@@ -114,6 +114,10 @@
         <input type="search" id="auSearch" placeholder="ค้นหารายการ...">
       </div>
 
+      <div style="display:flex;gap:8px;margin:8px 0 4px;">
+        <button class="csvb print" id="auPrintCount" style="flex:1;">🖨️ ใบนับ</button>
+        <button class="csvb print" id="auPrintResult" style="flex:1;">🖨️ ผลออดิท</button>
+      </div>
       <div id="auList"><div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div></div>
     </div>
   </div>
@@ -137,6 +141,45 @@ const au = {
   adjusts: {}    // {id: true}
 };
 
+function getAuditFiltered(){
+  var q=(au.filter.q||'').toLowerCase(), cat=au.filter.cat;
+  return au.balances.filter(function(it){
+    if(cat==='counted'){ if(!(au.actuals[it.id]!==undefined && au.actuals[it.id]!=='')) return false; }
+    else if(cat!=='all' && it.category!==cat) return false;
+    if(q && it.name.toLowerCase().indexOf(q)<0) return false;
+    return true;
+  });
+}
+var AU_CL={Waffle:'Waffle',KUFF:'KUFF',Drink:'Drink',Other:'อื่นๆ',Others:'อื่นๆ'};
+function printCountSheet(){
+  var items=getAuditFiltered();
+  if(!items.length){ toast('ไม่มีรายการให้พิมพ์'); return; }
+  var counts={}; items.forEach(function(it){ counts[it.category]=(counts[it.category]||0)+1; });
+  var rows=[],cur=null;
+  items.forEach(function(it){
+    var c=it.category||''; if(c!==cur){ cur=c; rows.push({ head:(AU_CL[c]||c||'อื่นๆ')+' ('+(counts[c]||0)+')' }); }
+    rows.push({ l: it.name, r: 'จริง:______', sub: 'ในระบบ '+it.balance+' '+(it.unit||'') });
+  });
+  var staff=document.getElementById('auStaff').value.trim();
+  maruPrintSlip({ title:'ใบนับสต๊อก', meta:['ผู้นับ: '+(staff||'____________'), 'วันที่นับ: ____/____/____'], rows:rows, summary:'รวม '+items.length+' รายการ' });
+}
+function printAuditResult(){
+  var items=getAuditFiltered().filter(function(it){ var a=au.actuals[it.id]; return a!==undefined && a!=='' && !isNaN(parseFloat(a)); });
+  if(!items.length){ toast('ยังไม่มีรายการที่นับจริง'); return; }
+  var counts={}; items.forEach(function(it){ counts[it.category]=(counts[it.category]||0)+1; });
+  var match=0,diffC=0,rows=[],cur=null;
+  items.forEach(function(it){
+    var c=it.category||''; if(c!==cur){ cur=c; rows.push({ head:(AU_CL[c]||c||'อื่นๆ')+' ('+(counts[c]||0)+')' }); }
+    var actual=parseFloat(au.actuals[it.id]); var diff=Math.round((actual-it.balance)*100)/100;
+    var tag = Math.abs(diff)<0.01 ? '✓' : ((diff>0?'+':'')+diff);
+    if(Math.abs(diff)<0.01) match++; else diffC++;
+    var adj = au.adjusts[it.id] ? ' [ปรับยอด]' : '';
+    var rs = au.reasons[it.id] ? (' · '+au.reasons[it.id]) : '';
+    rows.push({ l: it.name, r: tag, sub: 'ระบบ '+it.balance+' → นับ '+actual+(it.unit?' '+it.unit:'')+adj+rs });
+  });
+  var staff=document.getElementById('auStaff').value.trim();
+  maruPrintSlip({ title:'ผลออดิทสต๊อก', meta:['ผู้ตรวจ: '+(staff||'-')], rows:rows, summary:'นับ '+items.length+' · ตรงระบบ '+match+' · ส่วนต่าง '+diffC });
+}
 function load(){
   const box = document.getElementById('auList');
   box.innerHTML = '<div style="text-align:center;color:var(--ink-2);padding:20px;font-size:13px;">กำลังโหลด...</div>';
@@ -302,6 +345,8 @@ document.getElementById('auSaveBtn').addEventListener('click', function(){
     });
 });
 
+document.getElementById('auPrintCount').addEventListener('click', printCountSheet);
+document.getElementById('auPrintResult').addEventListener('click', printAuditResult);
 renderIcons();
 load();
 </script>
