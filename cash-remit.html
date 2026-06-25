@@ -94,6 +94,24 @@ async function loadAll(){
   catch(e){ $('histBox').innerHTML='<div class="empty">โหลดประวัติไม่ได้</div>'; }
 }
 
+function printRemitPending(){
+  var d=pend; if(!d || !d.days || !d.days.length){ toast('ไม่มียอดให้พิมพ์'); return; }
+  var rows=[];
+  rows.push({ l:'ยอดขายเงินสดรวม ('+d.days.length+' วัน)', r:baht(d.cashTotal) });
+  rows.push({ l:'หัก ค่าใช้จ่าย POS', r:'-'+baht(d.expenseTotal) });
+  rows.push({ head:'รายวันที่นับ' });
+  d.days.forEach(function(x){ rows.push({ l:x.dateDM+(x.closedBy?(' ('+x.closedBy+')'):''), r:baht(x.cash) }); });
+  if(d.expenses && d.expenses.length){ rows.push({ head:'ค่าใช้จ่าย POS' }); d.expenses.forEach(function(x){ rows.push({ l:x.dateDM+' '+(x.item||'-'), r:'-'+baht(x.amount) }); }); }
+  maruPrintSlip({ title:'สรุปเงินสดนำส่ง', meta:['รอบ '+(d.periodStart||'-')+' ถึง '+d.periodEnd, 'ผู้นำส่ง: ____________'], rows:rows, summary:'ยอดนำส่งจริง '+baht(d.netAmount) });
+}
+function printRemitRecord(r){
+  if(!r) return;
+  var rows=[ { l:'ยอดนำส่งจริง', r:baht(r.submitted_amount) }, { l:'ระบบคำนวณ', r:baht(r.net_amount) } ];
+  var diff=Number(r.diff)||0;
+  if(diff!==0) rows.push({ l:'ส่วนต่าง', r:(diff>0?'เกิน ':'ขาด ')+baht(Math.abs(diff)) });
+  var stL = r.status==='confirmed'?'ยืนยันแล้ว':(r.status==='flagged'?'ทักท้วง':'รอยืนยัน');
+  maruPrintSlip({ title:'หลักฐานนำส่งเงินสด', meta:['รอบ '+(r.period_start||'-')+' ถึง '+(r.period_end||'-'), 'ผู้นำส่ง: '+(r.submitted_by||'-'), 'ผู้รับ/ยืนยัน: '+(r.confirmed_by||'____________'), 'สถานะ: '+stL], rows:rows, summary:'ยอดนำส่ง '+baht(r.submitted_amount) });
+}
 function renderPending(){
   var d = pend;
   var daysHtml = d.days.length ? d.days.map(function(x){
@@ -116,9 +134,11 @@ function renderPending(){
     + warn
     + '<div class="ttl" style="font-size:14px;margin-top:14px;">รายวันที่นับ</div>'+daysHtml
     + '<div class="ttl" style="font-size:14px;margin-top:12px;">ค่าใช้จ่าย POS (เงินออกจากลิ้นชัก)</div>'+expHtml
+    + '<button class="csvb print" id="printPending" style="width:100%;margin-top:12px;">🖨️ พิมพ์สรุปนำส่ง</button>'
     + '<button class="btn green" id="openSubmit"'+(d.days.length?'':' disabled style="opacity:.5;"')+'>📤 บันทึกการนำส่ง</button>'
     + '</div>';
   if($('openSubmit')) $('openSubmit').addEventListener('click', openSubmit);
+  if($('printPending')) $('printPending').addEventListener('click', printRemitPending);
 }
 
 function renderConfirm(remits){
@@ -141,16 +161,19 @@ function renderConfirm(remits){
   $('confirmBox').querySelectorAll('[data-flag]').forEach(function(b){ b.addEventListener('click', function(){ doConfirm(b.getAttribute('data-flag'), 'flag'); }); });
 }
 
+var histRemits=[];
 function renderHistory(remits){
+  histRemits = remits||[];
   if(!remits.length){ $('histBox').innerHTML='<div class="empty">ยังไม่มีประวัติการนำส่ง</div>'; return; }
   $('histBox').innerHTML = remits.map(function(r){
     var st = r.status||'submitted';
     var label = st==='confirmed'?'ยืนยันแล้ว':(st==='flagged'?'ทักท้วง':'รอยืนยัน');
-    return '<div class="hist"><div class="top"><b style="font-family:Kanit;">'+baht(r.submitted_amount)+'</b><span class="pill '+st+'">'+label+'</span></div>'
+    return '<div class="hist"><div class="top"><b style="font-family:Kanit;">'+baht(r.submitted_amount)+'</b><span style="display:flex;gap:6px;align-items:center;"><span class="pill '+st+'">'+label+'</span><button class="mlog-print" data-print="'+r.id+'" title="พิมพ์">🖨️</button></span></div>'
       + '<div class="meta">รอบ '+(r.period_start||'-')+' → '+(r.period_end||'-')+' · ระบบคำนวณ '+baht(r.net_amount)+'<br>ส่งโดย '+escHtml(r.submitted_by||'-')+(r.confirmed_by?(' · ยืนยันโดย '+escHtml(r.confirmed_by)):'')+'</div>'
       + (r.slip_url?'<a href="'+r.slip_url+'" target="_blank"><img class="slipimg" src="'+r.slip_url+'"></a>':'')
       + '</div>';
   }).join('');
+  $('histBox').querySelectorAll('[data-print]').forEach(function(b){ b.addEventListener('click', function(){ var id=b.getAttribute('data-print'); var r=histRemits.filter(function(x){return String(x.id)===id;})[0]; if(r) printRemitRecord(r); }); });
 }
 
 function recalcByEnd(end){
