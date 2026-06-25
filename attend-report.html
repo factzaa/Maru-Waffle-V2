@@ -18,11 +18,11 @@
 .ranges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
 .rg{border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:20px;
   font-family:'Kanit';font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap;}
-.rg.on{background:var(--ink);color:#FFC629;border-color:var(--ink);}
+.rg.on{background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#2E2400;border-color:#F2B100;}
 
-.datebar{background:#1A1A1A;color:#fff;border-radius:14px;padding:10px 14px;display:flex;
+.datebar{background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:14px;padding:10px 14px;display:flex;
   justify-content:space-between;align-items:center;margin-bottom:14px;font-family:'Kanit';font-weight:600;font-size:13px;}
-.datebar input[type=date]{background:transparent;border:0;color:#fff;font-family:'Kanit';font-size:13px;}
+.datebar input[type=date]{background:transparent;border:0;color:var(--ink);font-family:'Kanit';font-size:13px;}
 .datebar .sep{color:var(--ink-2);}
 
 /* Filter */
@@ -36,7 +36,7 @@
   font-family:'Kanit';font-weight:600;font-size:12px;cursor:pointer;}
 .tchip.on.in{background:#15803D;color:#fff;border-color:#15803D;}
 .tchip.on.out{background:#B91C1C;color:#fff;border-color:#B91C1C;}
-.tchip.on.all{background:var(--ink);color:#FFC629;border-color:var(--ink);}
+.tchip.on.all{background:linear-gradient(180deg,#FFD84D,#FBC02D);color:#2E2400;border-color:#F2B100;}
 
 /* KPI */
 .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
@@ -131,6 +131,7 @@
       <div class="kpi out"><div class="v" id="kOut">0</div><div class="l">🔴 ออกงาน</div></div>
     </div>
 
+    <div style="display:flex;justify-content:flex-end;margin:2px 0 10px;"><button class="csvb print" id="attPrintBtn">🖨️ พิมพ์รายงาน</button></div>
     <div id="reportList">
       <div class="loading">กำลังโหลด...</div>
     </div>
@@ -296,6 +297,31 @@ $('lbClose').addEventListener('click', function(){ $('lightbox').classList.remov
 $('lightbox').addEventListener('click', function(e){ if(e.target===$('lightbox')) $('lightbox').classList.remove('show'); });
 
 // init
+function printAttend(){
+  var filtered = allLogs.filter(function(log){
+    if(filter.type!=='all' && log.type!==filter.type) return false;
+    if(filter.staffId && log.staffId!==filter.staffId) return false;
+    return true;
+  });
+  if(!filtered.length){ toast('ไม่มีรายการให้พิมพ์'); return; }
+  var groups={}; filtered.forEach(function(l){ (groups[l.date]=groups[l.date]||[]).push(l); });
+  var dows=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  var dates=Object.keys(groups).sort().reverse();
+  var rows=[], nIn=0, nOut=0;
+  dates.forEach(function(date){
+    var logs=groups[date]; var dt=new Date(date+'T00:00:00');
+    rows.push({ head: logs[0].dateDM+' · วัน'+dows[dt.getDay()] });
+    logs.slice().sort(function(a,b){ return String(a.time).localeCompare(String(b.time)); }).forEach(function(log){
+      if(log.type==='in') nIn++; else nOut++;
+      var tg = log.type==='in'?'เข้า':'ออก';
+      var geo = log.inGeofence ? '✓ ในเขต' : ('⚠ นอกเขต '+Math.round(log.distance)+'m');
+      rows.push({ l: log.staff+' ('+tg+')', r: String(log.time).slice(0,5), sub: geo });
+    });
+  });
+  var staffName = (filter.staffId && $('staffFilter').selectedOptions && $('staffFilter').selectedOptions[0]) ? $('staffFilter').selectedOptions[0].textContent : 'ทุกคน';
+  maruPrintSlip({ title:'รายงานเข้า-ออกงาน', meta:['ช่วง '+($('dStart').value||'')+' ถึง '+($('dEnd').value||''), 'พนักงาน: '+staffName], rows:rows, summary:'เข้า '+nIn+' · ออก '+nOut+' · รวม '+filtered.length });
+}
+document.getElementById('attPrintBtn').addEventListener('click', printAttend);
 setRange('month');
 renderIcons();
 loadStaff();
